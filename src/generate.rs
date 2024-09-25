@@ -16,6 +16,7 @@ impl SearchEngine for Search {
         Search {
             datas: Node::new(),
             find_list: Vec::new(),
+            section: ' ',
         }
     }
     fn generate(&mut self, current_dir: PathBuf) {
@@ -58,13 +59,12 @@ impl SearchEngine for Search {
                 return Err(());
             }
         };
-        let file_name = String::new();
+        let file_name = String::from(format!("{}{}", self.section, key));
         fn dfs(node: &Node, find_list: &mut Vec<PathBuf>, file_name: &String) {
             let mut path = node.val().clone();
             for i in &mut path {
-                i.push(file_name);
+                i.push(file_name.clone());
             }
-            dbg!(&path);
             find_list.append(&mut path);
             if node.groups().len() == 0 {
                 return;
@@ -77,7 +77,7 @@ impl SearchEngine for Search {
         Ok(&self.find_list)
     }
     fn store(&self) {
-        if exists("datas").unwrap_or(false) {
+        if !exists("datas").unwrap_or(false) {
             if let Err(e) = create_dir("datas") {
                 eprintln!("Failed to create directory: {}", e);
             }
@@ -90,6 +90,7 @@ impl SearchEngine for Search {
     }
 
     fn read(&mut self, section: char) {
+        self.section = section;
         let file = match File::open(format!("datas/data-{}", section)) {
             Ok(x) => x,
             Err(_) => {
@@ -104,6 +105,7 @@ impl SearchEngine for Search {
 pub struct Search {
     datas: Node,
     find_list: Vec<PathBuf>,
+    section: char,
 }
 #[cfg(test)]
 mod tests {

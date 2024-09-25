@@ -64,9 +64,13 @@ fn main() {
 
         if buf == "#C" {
             path.clear();
+            println!("Enter new directory path: (Exit#)");
             std::io::stdin().read_line(&mut path).unwrap();
             path.pop();
             path.pop();
+            if path.contains('#') {
+                path = "C:\\".to_string();
+            }
         }
         if buf == "#Q" {
             return;
@@ -75,12 +79,15 @@ fn main() {
             buf.pop();
             buf.pop();
         } else if buf == "#U" {
-            println!("Generating");
+            println!("Generating index for the current directory...");
             let collected_path = [&path].iter().collect();
             engine.generate(collected_path);
             engine.store();
-            println!("Done");
+            println!("Index generation complete.");
+        }
+        if buf.contains('#') {
             buf.clear();
+            continue;
         }
         if buf.len() > 0 {
             engine.read(buf.remove(0));
@@ -103,23 +110,40 @@ fn main() {
         );
         if d {
             if data.is_ok() {
-                println!("{:?}", data.unwrap());
-                println!("\rtype #0-{} to open", data.unwrap().len());
+                let mut w = 0;
+                for i in data.unwrap() {
+                    println!("{} [{}]", w, i.to_str().unwrap());
+                    w += 1;
+                }
+
+                println!(
+                    "\r\ntype #0-{} to open \n     #X to cancel",
+                    data.unwrap().len()
+                );
             } else {
                 println!("None");
             }
-            buf.clear();
-            std::io::stdin().read_line(&mut buf).unwrap();
-            buf.pop();
-            buf.pop();
-            if buf.contains('#') {
-                // dbg!(&buf);
-                buf.remove(0);
-                let dir = data.unwrap().get(buf.parse::<usize>().unwrap());
-                if let Some(dir) = dir {
-                    if let Err(e) = open::that(dir) {
-                        eprintln!("Failed to open directory: {}", e);
+            loop {
+                buf.clear();
+                std::io::stdin().read_line(&mut buf).unwrap();
+                buf.pop();
+                buf.pop();
+                if buf.contains('#') && !buf.contains("#X") {
+                    // dbg!(&buf);
+                    buf.remove(0);
+                    let dir = data.unwrap().get(match buf.parse::<usize>() {
+                        Ok(x) => x,
+                        Err(_) => 0,
+                    });
+
+                    if let Some(dir) = dir {
+                        if let Err(e) = open::that(dir) {
+                            eprintln!("Failed to open directory: {}", e);
+                        }
                     }
+                } else {
+                    println!("Exit");
+                    break;
                 }
             }
         }
