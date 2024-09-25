@@ -125,7 +125,7 @@ mod tests {
         let test_dir = PathBuf::from("C:\\");
         search.generate(test_dir);
         let key = String::from("cmd");
-        let result = dbg!(search.find(&key));
+        let result = search.find(&key);
         assert!(result.is_ok());
         assert!(!result.unwrap().is_empty());
     }
