@@ -1,39 +1,6 @@
-/// The main entry point for the search application.
-///
-/// This application allows users to interactively search for files and directories
-/// within a specified path. The user can input commands to change the search directory,
-/// update the search index, display search results, and quit the application.
-///
-/// # Commands
-/// - `#C`: Change the search directory. The user will be prompted to input a new directory path.
-/// - `#Q`: Quit the application.
-/// - `#U`: Update the search index. The application will regenerate the search index for the current directory.
-/// - `#D`: Display the search results for the last search query.
-/// - `#?`: Show the help message with the list of available commands.
-///
-/// # Usage
-/// The user can input a search query directly to search within the current directory.
-/// If the query ends with `#D`, the search results will be displayed.
-///
-/// The search results include the time taken to perform the search and the number of results found.
-/// If the `#D` command is used, the results will be printed to the console.
-///
-/// The user can also open a directory from the search results by inputting the index of the result prefixed with `#`.
-///
-/// # Example
-/// ```
-/// #C
-/// C:\Users\
-/// #U
-/// #D
-/// myfile.txt
-/// #0
-/// ```
-///
-/// This example changes the search directory to `C:\Users\`, updates the search index, displays the results,
-/// searches for `myfile.txt`, and opens the first result from the search results.
 mod data;
 mod generate;
+
 use generate::{Search, SearchEngine};
 use open;
 use std::time;
@@ -53,98 +20,95 @@ fn main() {
     );
 
     loop {
-        let mut d = false;
+        let mut display_results = false;
         let mut buf = String::new();
         std::io::stdin().read_line(&mut buf).unwrap();
-        buf.pop();
-        buf.pop();
-        if buf == "#?" {
-            println!("Commands:\n#C - Change directory\n#Q - Quit\n#U - Update index\n#D - Display results\n#? - Show this help message");
+        buf = buf.trim().to_string();
+
+        match buf.as_str() {
+            "#?" => println!("Commands:\n#C - Change directory\n#Q - Quit\n#U - Update index\n#D - Display results\n#? - Show this help message"),
+            "#C" => {
+                path.clear();
+                println!("Enter new directory path: (Exit#)");
+                std::io::stdin().read_line(&mut path).unwrap();
+                path = path.trim().to_string();
+                if path.contains('#') {
+                    path = "C:\\".to_string();
+                }
+            }
+            "#Q" => return,
+            _ if buf.ends_with("#D") => {
+                display_results = true;
+                buf = buf.trim_end_matches("#D").to_string();
+            }
+            "#U" => {
+                println!("Generating index for the current directory...");
+                engine.generate([&path].iter().collect());
+                engine.store();
+                println!("Index generation complete.");
+            }
+            _ => {}
         }
 
-        if buf == "#C" {
-            path.clear();
-            println!("Enter new directory path: (Exit#)");
-            std::io::stdin().read_line(&mut path).unwrap();
-            path.pop();
-            path.pop();
-            if path.contains('#') {
-                path = "C:\\".to_string();
-            }
-        }
-        if buf == "#Q" {
-            return;
-        } else if buf.ends_with("#D") {
-            d = true;
-            buf.pop();
-            buf.pop();
-        } else if buf == "#U" {
-            println!("Generating index for the current directory...");
-            let collected_path = [&path].iter().collect();
-            engine.generate(collected_path);
-            engine.store();
-            println!("Index generation complete.");
-        }
         if buf.contains('#') {
-            buf.clear();
             continue;
         }
-        if buf.len() > 0 {
+
+        if !buf.is_empty() {
             engine.read(buf.remove(0));
         }
-        let time = time::SystemTime::now();
+
+        let start_time = time::SystemTime::now();
         let data = engine.find(&buf);
-        let endtime = time::SystemTime::now();
-        let duration = endtime.duration_since(time).expect("Time went backwards");
+        let duration = start_time.elapsed().expect("Time went backwards");
+
         println!(
             "Search Done!  time cost:  {:?}  results: {}",
             duration,
-            match data {
-                Ok(x) => {
-                    x.len()
-                }
-                Err(_) => {
-                    0
-                }
-            }
+            data.as_ref().map_or(0, |x| x.len())
         );
-        if d {
-            if data.is_ok() {
-                let mut w = 0;
-                for i in data.unwrap() {
-                    println!("{} [{}]", w, i.to_str().unwrap());
-                    w += 1;
-                }
 
-                println!(
-                    "\r\ntype #0-{} to open \n     #X to cancel",
-                    data.unwrap().len()
-                );
+        if display_results {
+            if let Ok(results) = data {
+                for (i, result) in results.iter().enumerate() {
+                    println!("{} [{}]", i, result.to_str().unwrap());
+                }
+                println!("\r\ntype #0-{} to open \n     #X to cancel", results.len());
+
+                loop {
+                    buf.clear();
+                    std::io::stdin().read_line(&mut buf).unwrap();
+                    buf = buf.trim().to_string();
+
+                    if buf.starts_with("#L") {
+                        let index = buf.trim_start_matches("#L").parse::<usize>().unwrap_or(0);
+                        if let Some(dir) = results.get(index) {
+                            let dir_str = dir.to_str().unwrap_or_default();
+                            let parent_dir = dir_str.replace(
+                                dir.file_name()
+                                    .unwrap_or_default()
+                                    .to_str()
+                                    .unwrap_or_default(),
+                                "",
+                            );
+                            if let Err(e) = open::that(parent_dir) {
+                                eprintln!("Failed to open directory: {}", e);
+                            }
+                        }
+                    } else if buf.starts_with('#') && !buf.contains("#X") {
+                        let index = buf.trim_start_matches('#').parse::<usize>().unwrap_or(0);
+                        if let Some(dir) = results.get(index) {
+                            if let Err(e) = open::that(dir) {
+                                eprintln!("Failed to open directory: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("Exit");
+                        break;
+                    }
+                }
             } else {
                 println!("None");
-            }
-            loop {
-                buf.clear();
-                std::io::stdin().read_line(&mut buf).unwrap();
-                buf.pop();
-                buf.pop();
-                if buf.contains('#') && !buf.contains("#X") {
-                    // dbg!(&buf);
-                    buf.remove(0);
-                    let dir = data.unwrap().get(match buf.parse::<usize>() {
-                        Ok(x) => x,
-                        Err(_) => 0,
-                    });
-
-                    if let Some(dir) = dir {
-                        if let Err(e) = open::that(dir) {
-                            eprintln!("Failed to open directory: {}", e);
-                        }
-                    }
-                } else {
-                    println!("Exit");
-                    break;
-                }
             }
         }
     }
