@@ -3,7 +3,7 @@ mod search_engine;
 
 use open;
 use search_engine::{Search, SearchEngine};
-use std::time;
+use std::{io::Write, time};
 
 fn main() {
     let mut engine = Search::new();
@@ -20,6 +20,8 @@ fn main() {
     );
 
     loop {
+        print!("Search:");
+        std::io::stdout().flush().unwrap();
         let mut display_results = false;
         let mut buf = String::new();
         std::io::stdin().read_line(&mut buf).unwrap();
@@ -65,7 +67,7 @@ fn main() {
         let duration = start_time.elapsed().expect("Time went backwards");
 
         println!(
-            "Search Done!  time cost:  {:?}  results: {}",
+            "Search completed. Time taken: {:?}. Number of results: {}\n",
             duration,
             data.as_ref().map_or(0, |x| x.len())
         );
@@ -78,6 +80,8 @@ fn main() {
                 println!("\r\nType a number between 0 and {} to open the corresponding result (and L to locate), or 'X' to cancel.", results.len() - 1);
 
                 loop {
+                    print!("Open:");
+                    std::io::stdout().flush().unwrap();
                     buf.clear();
                     std::io::stdin().read_line(&mut buf).unwrap();
                     buf = buf.trim().to_string();
