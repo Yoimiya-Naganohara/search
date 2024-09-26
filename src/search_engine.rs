@@ -129,7 +129,7 @@ impl SearchEngine for Search {
     }
 
     fn save_index(&self) {
-        if self.index.len() == 0 {
+        if self.index.is_empty() {
             return;
         }
         if !exists(format!("index{}", self.part)).unwrap_or(false) {
