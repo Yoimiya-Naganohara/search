@@ -1,7 +1,6 @@
 use crate::data::{Node, PathTree};
 use std::{
     fs::{self, create_dir, exists, File},
-    os::windows::fs::FileTypeExt,
     path::PathBuf,
 };
 
