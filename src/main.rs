@@ -7,7 +7,11 @@ use std::{io::Write, time};
 
 fn main() {
     let mut engine = Search::new();
+    #[cfg(target_os = "windows")]
     let mut path = String::from("C:\\");
+
+    #[cfg(target_os = "linux")]
+    let mut path = String::from("/");
     println!(
         "
     ███████╗ █████╗ ███████╗████████╗    ███████╗███████╗ █████╗ ██████╗ ███████╗██╗  ██╗
