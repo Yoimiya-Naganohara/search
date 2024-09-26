@@ -155,15 +155,18 @@ pub struct Search {
     search_results: Vec<PathBuf>,
     part: char,
 }
-
 #[cfg(test)]
 mod tests {
+    use std::env;
+
+    use env::current_dir;
+
     use super::*;
 
     #[test]
     fn test_generate_index() {
         let mut search = Search::new();
-        let test_dir = PathBuf::from("C:\\");
+        let test_dir = current_dir().unwrap();
         search.generate_index(test_dir);
         assert!(!search.index.is_empty());
     }
@@ -171,9 +174,9 @@ mod tests {
     #[test]
     fn test_search() {
         let mut search = Search::new();
-        let test_dir = PathBuf::from("C:\\");
+        let test_dir = current_dir().unwrap();
         search.generate_index(test_dir);
-        let keyword = String::from("cmd");
+        let keyword = String::from("main.rs");
         let result = search.search(&keyword);
         assert!(result.is_ok());
         assert!(!result.unwrap().is_empty());
@@ -182,12 +185,12 @@ mod tests {
     #[test]
     fn test_save_and_load_index() {
         let mut search = Search::new();
-        let test_dir = PathBuf::from("C:\\");
+        let test_dir = current_dir().unwrap();
         search.generate_index(test_dir);
         search.save_index();
 
         let mut new_search = Search::new();
-        new_search.load_index('a'); // Assuming 'a' is a valid section
+        new_search.load_index('m'); // Assuming 'a' is a valid section
         assert!(!new_search.index.is_empty());
     }
 }
