@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 /// A trait representing a tree structure where each node is associated with a path.
+#[allow(dead_code)]
 pub(crate) trait PathTree {
     /// Creates a new instance of the tree.
     fn new() -> Self;
