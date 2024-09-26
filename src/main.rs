@@ -44,9 +44,10 @@ fn main() {
                 std::io::stdin().read_line(&mut path).unwrap();
                 path = path.trim().to_string();
                 if path.contains('#') {
-                    path = pre;continue;
+                    path = pre;
                 }
                 engine.set_part(path.chars().next().unwrap());
+                continue;
             }
             "#Q" => return,
             _ if buf.ends_with("#D") => {
