@@ -1,3 +1,8 @@
+<div align=center>
+
+[中文](README_CN.md) | [English](README.md)
+
+</div>
 
 # Search Engine CLI
 
