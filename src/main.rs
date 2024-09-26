@@ -1,7 +1,7 @@
 mod data;
-mod generate;
+mod search_engine;
 
-use generate::{Search, SearchEngine};
+use search_engine::{Search, SearchEngine};
 use open;
 use std::time;
 
@@ -28,13 +28,15 @@ fn main() {
         match buf.as_str() {
             "#?" => println!("Commands:\n#C - Change directory\n#Q - Quit\n#U - Update index\n#D - Display results\n#? - Show this help message"),
             "#C" => {
+                let pre=path.clone();
                 path.clear();
                 println!("Enter new directory path: (Exit#)");
                 std::io::stdin().read_line(&mut path).unwrap();
                 path = path.trim().to_string();
                 if path.contains('#') {
-                    path = "C:\\".to_string();
+                    path=pre;
                 }
+                engine.set_part(path.chars().next().unwrap());
             }
             "#Q" => return,
             _ if buf.ends_with("#D") => {

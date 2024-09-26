@@ -120,7 +120,7 @@ impl PathTree for Node {
 
     fn len(&self) -> usize {
         fn count_nodes(node: &Node) -> usize {
-            let mut count = 1; // Count the current node
+            let mut count = node.children.len(); // Count the current node
             for child_node in node.children.values() {
                 count += count_nodes(child_node);
             }
@@ -187,11 +187,12 @@ mod tests {
     #[test]
     fn test_len() {
         let mut root_node = Node::new();
+        assert_eq!(root_node.len(), 0);
         root_node.insert("key1", PathBuf::from("/some/path1"));
         root_node.insert("key2", PathBuf::from("/some/path2"));
 
         dbg!(root_node.clone());
-        assert_eq!(root_node.len(), 6); // root node + 2 key nodes
+        assert_eq!(root_node.len(), 5); // root node + 2 key nodes
     }
 
     #[test]

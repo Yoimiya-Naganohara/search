@@ -1,6 +1,7 @@
 use crate::data::{Node, PathTree};
 use std::{
     fs::{self, create_dir, exists, File},
+    os::windows::fs::FileTypeExt,
     path::PathBuf,
 };
 
@@ -36,6 +37,17 @@ pub(crate) trait SearchEngine {
     ///
     /// * `section` - A `char` representing the section to load.
     fn load_index(&mut self, section: char);
+
+    /// Loads an index from disk for a given section.
+    ///
+    /// # Arguments
+    ///
+    /// * `section` - A `char`
+    /// Sets the part of the index to be used.    ///
+    /// # Arguments
+    ///
+    /// * `part` - A `char` representing the part of the index to set.
+    fn set_part(&mut self, part: char);
 }
 
 impl SearchEngine for Search {
@@ -44,6 +56,7 @@ impl SearchEngine for Search {
             index: Node::new(),
             search_results: Vec::new(),
             section: ' ',
+            part: 'C',
         }
     }
 
@@ -61,9 +74,13 @@ impl SearchEngine for Search {
             let entries = fs::read_dir(current_dir).expect("Failed to read directory");
             for entry in entries {
                 let entry = entry.expect("Failed to get entry");
-                if entry.file_type().unwrap().is_dir() {
+                if entry.file_type().unwrap().is_dir()
+                    || entry.file_type().unwrap().is_symlink_dir()
+                {
                     traverse_directory(index, &entry.path());
-                } else if entry.file_type().unwrap().is_file() {
+                } else if entry.file_type().unwrap().is_file()
+                    || entry.file_type().unwrap().is_symlink_file()
+                {
                     let mut path: Vec<String> = entry
                         .path()
                         .to_str()
@@ -112,14 +129,22 @@ impl SearchEngine for Search {
     }
 
     fn save_index(&self) {
-        if !exists("index").unwrap_or(false) {
-            if let Err(e) = create_dir("index") {
+        if self.index.len() == 0 {
+            return;
+        }
+        if !exists(format!("index{}", self.part)).unwrap_or(false) {
+            if let Err(e) = create_dir(format!("index{}", self.part)) {
                 eprintln!("Failed to create directory: {}", e);
             }
         }
         for (ch, node) in self.index.groups() {
-            let file = File::create(format!("index/data-{}{}", ch, ch.is_uppercase()))
-                .expect("Failed to create file");
+            let file = File::create(format!(
+                "index{}/data-{}{}",
+                self.part,
+                ch,
+                ch.is_uppercase()
+            ))
+            .expect("Failed to create file");
             let mut writer = std::io::BufWriter::new(file);
             bincode::serialize_into(&mut writer, node).expect("Failed to serialize data");
         }
@@ -127,7 +152,12 @@ impl SearchEngine for Search {
 
     fn load_index(&mut self, section: char) {
         self.section = section;
-        let file = match File::open(format!("index/data-{}{}", section, section.is_uppercase())) {
+        let file = match File::open(format!(
+            "index{}/data-{}{}",
+            self.part,
+            section,
+            section.is_uppercase()
+        )) {
             Ok(x) => x,
             Err(_) => {
                 self.index = Node::new();
@@ -137,12 +167,16 @@ impl SearchEngine for Search {
         let mut reader = std::io::BufReader::new(file);
         self.index = bincode::deserialize_from(&mut reader).expect("Failed to deserialize data");
     }
+    fn set_part(&mut self, part: char) {
+        self.part = part;
+    }
 }
 
 pub struct Search {
     index: Node,
     search_results: Vec<PathBuf>,
     section: char,
+    part: char,
 }
 
 #[cfg(test)]
