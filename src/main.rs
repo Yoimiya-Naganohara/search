@@ -20,7 +20,7 @@ fn main() {
     ██╔════╝██╔══██║╚════██║   ██║       ╚════██║██╔══╝  ██╔══██║██╔═══╝ ██║     ██╔══██║
     ██║     ██║  ██║███████║   ██║       ███████║███████╗██║  ██║██║  ██╗███████╗██║  ██║
     ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝       ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
-    \r\n type #? to get help"
+    \r\n Type '#?' for help"
     );
 
     loop {
@@ -36,7 +36,7 @@ fn main() {
             "#C" => {
                 let pre=path.clone();
                 path.clear();
-                println!("Enter new directory path: (Exit#)");
+                println!("Please enter the new directory path (current: {}). Type '#' to cancel:", pre);
                 std::io::stdin().read_line(&mut path).unwrap();
                 path = path.trim().to_string();
                 if path.contains('#') {
@@ -51,11 +51,18 @@ fn main() {
             }
             "#U" => {
                 println!("Generating index for the current directory...");
+                let start_time = time::SystemTime::now();
                 engine.generate_index([&path].iter().collect());
                 engine.save_index();
-                println!("Index generation complete.");
+                let duration = start_time.elapsed().expect("Time went backwards");
+                println!(
+                    "Index generation complete. Time taken: {:?}. Number of indexed items: {}",
+                    duration,
+                    engine.indexed()
+                );
             }
-            _ => {println!("Undefined action");}
+            _ => {
+            }
         }
 
         if buf.contains('#') {

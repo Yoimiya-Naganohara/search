@@ -47,6 +47,7 @@ pub(crate) trait SearchEngine {
     ///
     /// * `part` - A `char` representing the part of the index to set.
     fn set_part(&mut self, part: char);
+    fn indexed(&self) -> usize;
 }
 
 impl SearchEngine for Search {
@@ -147,6 +148,9 @@ impl SearchEngine for Search {
     }
     fn set_part(&mut self, part: char) {
         self.search_part = part;
+    }
+    fn indexed(&self) -> usize {
+        self.index.len()
     }
 }
 
