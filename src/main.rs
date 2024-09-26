@@ -115,22 +115,26 @@ fn main() {
                     buf = buf.trim().to_string();
                     match buf.as_str() {
                         buf if buf.contains("L") => {
-                            let index = buf.trim_matches('L').parse::<usize>().unwrap_or(0);
-                            if let Some(dir) = results.get(index) {
-                                let dir_str = dir.to_str().unwrap_or_default();
-                                let parent_dir = dir_str.replace(
-                                    dir.file_name()
-                                        .unwrap_or_default()
-                                        .to_str()
-                                        .unwrap_or_default(),
-                                    "",
-                                );
-                                if let Err(e) = open::that(parent_dir) {
-                                    eprintln!(
-                                        "{}",
-                                        format!("Failed to open directory: {}", e).red()
+                            let index = buf.trim_matches('L').parse::<usize>();
+                            if let Ok(index) = index {
+                                if let Some(dir) = results.get(index) {
+                                    let dir_str = dir.to_str().unwrap_or_default();
+                                    let parent_dir = dir_str.replace(
+                                        dir.file_name()
+                                            .unwrap_or_default()
+                                            .to_str()
+                                            .unwrap_or_default(),
+                                        "",
                                     );
+                                    if let Err(e) = open::that(parent_dir) {
+                                        eprintln!(
+                                            "{}",
+                                            format!("Failed to open directory: {}", e).red()
+                                        );
+                                    }
                                 }
+                            } else {
+                                println!("{}", "Invalid input. Please enter a valid number.".red());
                             }
                         }
                         "X" => {
@@ -138,14 +142,17 @@ fn main() {
                             break;
                         }
                         _ => {
-                            let index = buf.parse::<usize>().unwrap_or(0);
-                            if let Some(dir) = results.get(index) {
-                                if let Err(e) = open::that(dir) {
-                                    eprintln!(
-                                        "{}",
-                                        format!("Failed to open directory: {}", e).red()
-                                    );
+                            if let Ok(index) = buf.parse::<usize>() {
+                                if let Some(dir) = results.get(index) {
+                                    if let Err(e) = open::that(dir) {
+                                        eprintln!(
+                                            "{}",
+                                            format!("Failed to open directory: {}", e).red()
+                                        );
+                                    }
                                 }
+                            } else {
+                                println!("{}", "Invalid input. Please enter a valid number.".red());
                             }
                         }
                     }
