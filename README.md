@@ -76,6 +76,7 @@ Open: 1
 - [open](https://crates.io/crates/open)
 - [serde](https://crates.io/crates/serde)
 - [bincode](https://crates.io/crates/bincode)
+- [colored](https://crates.io/crates/colored)
 
 ## License
 
