@@ -79,32 +79,35 @@ fn main() {
                     buf.clear();
                     std::io::stdin().read_line(&mut buf).unwrap();
                     buf = buf.trim().to_string();
-
-                    if buf.starts_with("#L") {
-                        let index = buf.trim_start_matches("#L").parse::<usize>().unwrap_or(0);
-                        if let Some(dir) = results.get(index) {
-                            let dir_str = dir.to_str().unwrap_or_default();
-                            let parent_dir = dir_str.replace(
-                                dir.file_name()
-                                    .unwrap_or_default()
-                                    .to_str()
-                                    .unwrap_or_default(),
-                                "",
-                            );
-                            if let Err(e) = open::that(parent_dir) {
-                                eprintln!("Failed to open directory: {}", e);
+                    match buf.as_str() {
+                        buf if buf.starts_with("#L") => {
+                            let index = buf.trim_start_matches("#L").parse::<usize>().unwrap_or(0);
+                            if let Some(dir) = results.get(index) {
+                                let dir_str = dir.to_str().unwrap_or_default();
+                                let parent_dir = dir_str.replace(
+                                    dir.file_name()
+                                        .unwrap_or_default()
+                                        .to_str()
+                                        .unwrap_or_default(),
+                                    "",
+                                );
+                                if let Err(e) = open::that(parent_dir) {
+                                    eprintln!("Failed to open directory: {}", e);
+                                }
                             }
                         }
-                    } else if buf.starts_with('#') && !buf.contains("#X") {
-                        let index = buf.trim_start_matches('#').parse::<usize>().unwrap_or(0);
-                        if let Some(dir) = results.get(index) {
-                            if let Err(e) = open::that(dir) {
-                                eprintln!("Failed to open directory: {}", e);
+                        buf if buf.starts_with('#') && !buf.contains("#X") => {
+                            let index = buf.trim_start_matches('#').parse::<usize>().unwrap_or(0);
+                            if let Some(dir) = results.get(index) {
+                                if let Err(e) = open::that(dir) {
+                                    eprintln!("Failed to open directory: {}", e);
+                                }
                             }
                         }
-                    } else {
-                        println!("Exit");
-                        break;
+                        _ => {
+                            println!("Exit");
+                            break;
+                        }
                     }
                 }
             } else {
