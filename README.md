@@ -88,3 +88,6 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 ## Acknowledgements
 
 - ASCII art generated using [patorjk.com](http://patorjk.com/software/taag/)
+
+## To do
+- wildcard pattern (may increase memory usage)
