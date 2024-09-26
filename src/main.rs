@@ -43,8 +43,8 @@ fn main() {
             }
             "#U" => {
                 println!("Generating index for the current directory...");
-                engine.generate([&path].iter().collect());
-                engine.store();
+                engine.generate_index([&path].iter().collect());
+                engine.save_index();
                 println!("Index generation complete.");
             }
             _ => {}
@@ -55,11 +55,11 @@ fn main() {
         }
 
         if !buf.is_empty() {
-            engine.read(buf.remove(0));
+            engine.load_index(buf.remove(0));
         }
 
         let start_time = time::SystemTime::now();
-        let data = engine.find(&buf);
+        let data = engine.search(&buf);
         let duration = start_time.elapsed().expect("Time went backwards");
 
         println!(
