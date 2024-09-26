@@ -55,7 +55,7 @@ fn main() {
                 engine.save_index();
                 println!("Index generation complete.");
             }
-            _ => {}
+            _ => {println!("Undefined action");}
         }
 
         if buf.contains('#') {

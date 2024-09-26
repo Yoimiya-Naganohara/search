@@ -54,7 +54,7 @@ impl SearchEngine for Search {
         Search {
             index: Node::new(),
             search_results: Vec::new(),
-            part: 'C',
+            search_part: 'C',
         }
     }
 
@@ -111,15 +111,15 @@ impl SearchEngine for Search {
         if self.index.is_empty() {
             return;
         }
-        if !exists(format!("index{}", self.part)).unwrap_or(false) {
-            if let Err(e) = create_dir(format!("index{}", self.part)) {
+        if !exists(format!("index{}", self.search_part)).unwrap_or(false) {
+            if let Err(e) = create_dir(format!("index{}", self.search_part)) {
                 eprintln!("Failed to create directory: {}", e);
             }
         }
         for (ch, node) in self.index.groups() {
             let file = File::create(format!(
                 "index{}/data-{}{}",
-                self.part,
+                self.search_part,
                 ch,
                 ch.is_uppercase()
             ))
@@ -132,7 +132,7 @@ impl SearchEngine for Search {
     fn load_index(&mut self, section: char) {
         let file = match File::open(format!(
             "index{}/data-{}{}",
-            self.part,
+            self.search_part,
             section,
             section.is_uppercase()
         )) {
@@ -146,14 +146,14 @@ impl SearchEngine for Search {
         self.index = bincode::deserialize_from(&mut reader).expect("Failed to deserialize data");
     }
     fn set_part(&mut self, part: char) {
-        self.part = part;
+        self.search_part = part;
     }
 }
 
 pub struct Search {
     index: Node,
     search_results: Vec<PathBuf>,
-    part: char,
+    search_part: char,
 }
 #[cfg(test)]
 mod tests {
