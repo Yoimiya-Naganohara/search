@@ -55,7 +55,6 @@ impl SearchEngine for Search {
         Search {
             index: Node::new(),
             search_results: Vec::new(),
-            section: ' ',
             part: 'C',
         }
     }
@@ -71,25 +70,13 @@ impl SearchEngine for Search {
             let entries = fs::read_dir(current_dir).expect("Failed to read directory");
             for entry in entries {
                 let entry = entry.expect("Failed to get entry");
-                if entry.file_type().unwrap().is_dir()
-                    || entry.file_type().unwrap().is_symlink_dir()
-                {
+                if entry.file_type().unwrap().is_dir() {
                     traverse_directory(index, &entry.path());
-                } else if entry.file_type().unwrap().is_file()
-                    || entry.file_type().unwrap().is_symlink_file()
-                {
-                    let mut path: Vec<String> = entry
-                        .path()
-                        .to_str()
-                        .unwrap()
-                        .to_string()
-                        .split("\\")
-                        .map(|s| s.to_string())
-                        .collect();
-                    path[0].push('\\');
-                    let file_name = path.pop().unwrap();
-                    let path: PathBuf = path.iter().collect();
-                    index.insert(&file_name, path);
+                } else if entry.file_type().unwrap().is_file() {
+                    let file_name = entry.file_name();
+                    let file_name_str = file_name.to_str().unwrap();
+                    let path = entry.path();
+                    index.insert(file_name_str, path);
                 }
             }
         }
@@ -105,23 +92,19 @@ impl SearchEngine for Search {
                 return Err(());
             }
         };
-        let file_name = String::from(format!("{}{}", self.section, keyword));
 
-        fn traverse_node(node: &Node, search_results: &mut Vec<PathBuf>, file_name: &String) {
+        fn traverse_node(node: &Node, search_results: &mut Vec<PathBuf>) {
             let mut path = node.val().clone();
-            for i in &mut path {
-                i.push(file_name.clone());
-            }
             search_results.append(&mut path);
             if node.groups().len() == 0 {
                 return;
             }
-            for (ch, sub_node) in node.groups() {
-                traverse_node(sub_node, search_results, &format!("{}{}", file_name, ch));
+            for (_, sub_node) in node.groups() {
+                traverse_node(sub_node, search_results);
             }
         }
 
-        traverse_node(node, &mut self.search_results, &file_name);
+        traverse_node(node, &mut self.search_results);
         Ok(&self.search_results)
     }
 
@@ -148,7 +131,6 @@ impl SearchEngine for Search {
     }
 
     fn load_index(&mut self, section: char) {
-        self.section = section;
         let file = match File::open(format!(
             "index{}/data-{}{}",
             self.part,
@@ -172,7 +154,6 @@ impl SearchEngine for Search {
 pub struct Search {
     index: Node,
     search_results: Vec<PathBuf>,
-    section: char,
     part: char,
 }
 
