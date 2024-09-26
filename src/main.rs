@@ -1,6 +1,7 @@
 mod data;
 mod search_engine;
 
+use colored::Colorize;
 use open;
 use search_engine::{Search, SearchEngine};
 use std::{io::Write, time};
@@ -13,6 +14,7 @@ fn main() {
     #[cfg(target_os = "linux")]
     let mut path = String::from("/");
     println!(
+        "{}",
         "
     ███████╗ █████╗ ███████╗████████╗    ███████╗███████╗ █████╗ ██████╗ ███████╗██╗  ██╗
     ██╔════╝██╔══██╗██╔════╝╚══██╔══╝    ██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝██║  ██║
@@ -21,10 +23,12 @@ fn main() {
     ██║     ██║  ██║███████║   ██║       ███████║███████╗██║  ██║██║  ██╗███████╗██║  ██║
     ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝       ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
     \r\n Type '#?' for help"
+            .blue()
+            .bold()
     );
 
     loop {
-        print!("Search:");
+        print!("{}", "Search:".green().bold());
         std::io::stdout().flush().unwrap();
         let mut display_results = false;
         let mut buf = String::new();
@@ -32,15 +36,15 @@ fn main() {
         buf = buf.trim().to_string();
 
         match buf.as_str() {
-            "#?" => println!("Commands:\n#C - Change directory\n#Q - Quit\n#U - Update index\n#D - Display results\n#? - Show this help message"),
+            "#?" => println!("{}", "Commands:\n#C - Change directory\n#Q - Quit\n#U - Update index\n#D - Display results\n#? - Show this help message".yellow()),
             "#C" => {
-                let pre=path.clone();
+                let pre = path.clone();
                 path.clear();
-                println!("Please enter the new directory path (current: {}). Type '#' to cancel:", pre);
+                println!("{}", format!("Please enter the new directory path (current: {}). Type '#' to cancel:", pre).yellow());
                 std::io::stdin().read_line(&mut path).unwrap();
                 path = path.trim().to_string();
                 if path.contains('#') {
-                    path=pre;
+                    path = pre;continue;
                 }
                 engine.set_part(path.chars().next().unwrap());
             }
@@ -50,22 +54,30 @@ fn main() {
                 buf = buf.trim_end_matches("#D").to_string();
             }
             "#U" => {
-                println!("Generating index for the current directory...");
+                println!("{}", "Generating index for the current directory...".yellow());
                 let start_time = time::SystemTime::now();
                 engine.generate_index([&path].iter().collect());
                 engine.save_index();
                 let duration = start_time.elapsed().expect("Time went backwards");
                 println!(
-                    "Index generation complete. Time taken: {:?}. Number of indexed items: {}",
-                    duration,
-                    engine.indexed()
+                    "{}",
+                    format!(
+                        "Index generation complete. Time taken: {:?}. Number of indexed items: {}",
+                        duration,
+                        engine.indexed()
+                    ).green()
                 );
+                continue;
             }
             _ => {
             }
         }
 
         if buf.contains('#') {
+            println!(
+                "{}",
+                "Undefined action. Please enter a valid command.".red()
+            );
             continue;
         }
 
@@ -78,20 +90,24 @@ fn main() {
         let duration = start_time.elapsed().expect("Time went backwards");
 
         println!(
-            "Search completed. Time taken: {:?}. Number of results: {}\n",
-            duration,
-            data.as_ref().map_or(0, |x| x.len())
+            "{}",
+            format!(
+                "Search completed. Time taken: {:?}. Number of results: {}\n",
+                duration,
+                data.as_ref().map_or(0, |x| x.len())
+            )
+            .green()
         );
 
         if display_results {
             if let Ok(results) = data {
                 for (i, result) in results.iter().enumerate() {
-                    println!("{} [{}]", i, result.to_str().unwrap());
+                    println!("{}", format!("{} [{}]", i, result.to_str().unwrap()).cyan());
                 }
-                println!("\r\nType a number between 0 and {} to open the corresponding result (and L to locate), or 'X' to cancel.", results.len() - 1);
+                println!("{}", format!("\r\nType a number between 0 and {} to open the corresponding result (and L to locate), or 'X' to cancel.", results.len() - 1).yellow());
 
                 loop {
-                    print!("Open:");
+                    print!("{}", "Open:".green().bold());
                     std::io::stdout().flush().unwrap();
                     buf.clear();
                     std::io::stdin().read_line(&mut buf).unwrap();
@@ -109,26 +125,32 @@ fn main() {
                                     "",
                                 );
                                 if let Err(e) = open::that(parent_dir) {
-                                    eprintln!("Failed to open directory: {}", e);
+                                    eprintln!(
+                                        "{}",
+                                        format!("Failed to open directory: {}", e).red()
+                                    );
                                 }
                             }
                         }
                         "X" => {
-                            println!("Exit");
+                            println!("{}", "Exit".yellow());
                             break;
                         }
                         _ => {
                             let index = buf.parse::<usize>().unwrap_or(0);
                             if let Some(dir) = results.get(index) {
                                 if let Err(e) = open::that(dir) {
-                                    eprintln!("Failed to open directory: {}", e);
+                                    eprintln!(
+                                        "{}",
+                                        format!("Failed to open directory: {}", e).red()
+                                    );
                                 }
                             }
                         }
                     }
                 }
             } else {
-                println!("None");
+                println!("{}", "None".red());
             }
         }
     }
