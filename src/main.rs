@@ -1,8 +1,8 @@
 mod data;
 mod search_engine;
 
-use search_engine::{Search, SearchEngine};
 use open;
+use search_engine::{Search, SearchEngine};
 use std::time;
 
 fn main() {
@@ -75,15 +75,15 @@ fn main() {
                 for (i, result) in results.iter().enumerate() {
                     println!("{} [{}]", i, result.to_str().unwrap());
                 }
-                println!("\r\ntype #0-{} to open \n     #X to cancel", results.len());
+                println!("\r\nType a number between 0 and {} to open the corresponding result (and L to locate), or 'X' to cancel.", results.len() - 1);
 
                 loop {
                     buf.clear();
                     std::io::stdin().read_line(&mut buf).unwrap();
                     buf = buf.trim().to_string();
                     match buf.as_str() {
-                        buf if buf.starts_with("#L") => {
-                            let index = buf.trim_start_matches("#L").parse::<usize>().unwrap_or(0);
+                        buf if buf.contains("L") => {
+                            let index = buf.trim_matches('L').parse::<usize>().unwrap_or(0);
                             if let Some(dir) = results.get(index) {
                                 let dir_str = dir.to_str().unwrap_or_default();
                                 let parent_dir = dir_str.replace(
@@ -98,17 +98,17 @@ fn main() {
                                 }
                             }
                         }
-                        buf if buf.starts_with('#') && !buf.contains("#X") => {
-                            let index = buf.trim_start_matches('#').parse::<usize>().unwrap_or(0);
+                        "X" => {
+                            println!("Exit");
+                            break;
+                        }
+                        _ => {
+                            let index = buf.parse::<usize>().unwrap_or(0);
                             if let Some(dir) = results.get(index) {
                                 if let Err(e) = open::that(dir) {
                                     eprintln!("Failed to open directory: {}", e);
                                 }
                             }
-                        }
-                        _ => {
-                            println!("Exit");
-                            break;
                         }
                     }
                 }

@@ -65,7 +65,6 @@ impl SearchEngine for Search {
 
         fn traverse_directory(index: &mut Node, current_dir: &PathBuf) {
             if current_dir.metadata().is_err()
-                || current_dir.metadata().unwrap().permissions().readonly()
                 || fs::read_dir(&current_dir).is_err()
             {
                 return;
