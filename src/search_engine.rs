@@ -28,7 +28,7 @@ pub(crate) trait SearchEngine {
     fn search(&mut self, keyword: &String) -> Result<&Vec<PathBuf>, ()>;
 
     /// Saves the current index to disk.
-    fn save_index(&self);
+    fn save_index(&mut self);
 
     /// Loads an index from disk for a given section.
     ///
@@ -47,6 +47,7 @@ pub(crate) trait SearchEngine {
     ///
     /// * `part` - A `char` representing the part of the index to set.
     fn set_part(&mut self, part: char);
+
     fn indexed(&self) -> usize;
 }
 
@@ -86,6 +87,7 @@ impl SearchEngine for Search {
 
     fn search(&mut self, keyword: &String) -> Result<&Vec<PathBuf>, ()> {
         self.search_results.clear();
+
         let node = match self.index.get(keyword) {
             Some(x) => x,
             None => {
@@ -108,7 +110,7 @@ impl SearchEngine for Search {
         Ok(&self.search_results)
     }
 
-    fn save_index(&self) {
+    fn save_index(&mut self) {
         if self.index.is_empty() {
             return;
         }
@@ -128,6 +130,7 @@ impl SearchEngine for Search {
             let mut writer = std::io::BufWriter::new(file);
             bincode::serialize_into(&mut writer, node).expect("Failed to serialize data");
         }
+        self.index.clear();
     }
 
     fn load_index(&mut self, section: char) {
