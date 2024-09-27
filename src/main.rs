@@ -46,14 +46,14 @@ fn main() {
                 println!(
                     "{}",
                     format!(
-                        "Please enter the new directory path (current: {}). Type ':' to cancel:",
+                        "Please enter the new directory path (current: {}). Type ':x' to cancel:",
                         pre
                     )
                     .yellow()
                 );
                 std::io::stdin().read_line(&mut path).unwrap();
                 path = path.trim().to_string();
-                if path.contains(':') {
+                if path.contains(":x") {
                     path = pre;
                 }
                 engine.set_part(path.chars().next().unwrap());
