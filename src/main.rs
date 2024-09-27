@@ -128,7 +128,7 @@ fn main() {
                     buf = buf.trim().to_string();
                     match buf.as_str() {
                         buf if buf.contains("l") => {
-                            let index = buf.trim_matches('L').parse::<usize>();
+                            let index = buf.trim_matches('l').parse::<usize>();
                             if let Ok(index) = index {
                                 if let Some(dir) = results.get(index) {
                                     let dir_str = dir.to_str().unwrap_or_default();
