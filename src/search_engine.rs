@@ -161,23 +161,28 @@ impl SearchEngine for Search {
                     traverse_directory(index, &entry.path(), extension_node, section);
                 } else if entry.file_type().unwrap().is_file() {
                     let file_name = entry.file_name();
-                    let file_name_str = file_name.to_str().unwrap();
-                    let file_name = file_name_str.to_string();
+                    let file_name_str = match file_name.to_str() {
+                        Some(s) => s,
+                        None => continue,
+                    };
+                    let mut dot = true;
                     let path = entry.path();
-                    let extension = path
-                        .extension()
-                        .unwrap_or(OsStr::new("None"))
-                        .to_str()
-                        .unwrap_or("None")
-                        .to_string();
-
-                    if section == &'.' {
-                        extension_node.insert(&extension, path);
-                    } else if file_name_str.starts_with(section.clone()) || section == &'*' {
-                        if !file_name_str.starts_with('.') {
-                            index.insert(&file_name, path.clone());
+                    if *section == '.' {
+                        dot = false;
+                    }
+                    if file_name_str.starts_with(*section) || *section == '*' || *section == '.' {
+                        if !file_name_str.starts_with('.') && dot {
+                            index.insert(file_name_str, path.clone());
                         }
-                        extension_node.insert(&extension, path);
+                        let mut file_name = file_name_str.to_string();
+                        file_name.remove(0);
+
+                        // generate new node based on file extension
+                        let extension = path
+                            .extension()
+                            .and_then(OsStr::to_str)
+                            .unwrap_or(&file_name);
+                        extension_node.insert(extension, path.clone());
                     }
                 }
             }
