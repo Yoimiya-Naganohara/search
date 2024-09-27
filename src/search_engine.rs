@@ -162,7 +162,6 @@ impl SearchEngine for Search {
                 } else if entry.file_type().unwrap().is_file() {
                     let file_name = entry.file_name();
                     let file_name_str = file_name.to_str().unwrap();
-                    let path = entry.path();
                     let file_name = file_name_str.to_string();
                     let path = entry.path();
                     let extension = path
@@ -172,7 +171,10 @@ impl SearchEngine for Search {
                         .unwrap_or("None")
                         .to_string();
 
-                    if section == &'.' || file_name_str.starts_with(section.clone()) || section == &'*' {
+                    if section == &'.'
+                        || file_name_str.starts_with(section.clone())
+                        || section == &'*'
+                    {
                         if !file_name_str.starts_with('.') {
                             index.insert(&file_name, path.clone());
                         }
