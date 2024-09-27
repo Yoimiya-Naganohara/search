@@ -163,29 +163,20 @@ impl SearchEngine for Search {
                     let file_name = entry.file_name();
                     let file_name_str = file_name.to_str().unwrap();
                     let path = entry.path();
-                    if file_name_str.starts_with(section.clone())
-                        || section == &'*'
-                        || section == &'.'
-                    {
+                    let file_name = file_name_str.to_string();
+                    let path = entry.path();
+                    let extension = path
+                        .extension()
+                        .unwrap_or(OsStr::new("None"))
+                        .to_str()
+                        .unwrap_or("None")
+                        .to_string();
+
+                    if section == &'.' || file_name_str.starts_with(section.clone()) || section == &'*' {
                         if !file_name_str.starts_with('.') {
-                            index.insert(file_name_str, path);
+                            index.insert(&file_name, path.clone());
                         }
-                        let mut file_name = file_name_str.to_string();
-                        file_name.remove(0);
-
-                        // generate new node based on file extension
-
-                        let path = entry.path();
-                        let mut extension = path
-                            .extension()
-                            .unwrap_or(OsStr::new("None"))
-                            .to_str()
-                            .unwrap();
-                        let path = entry.path();
-                        if extension == "None" {
-                            extension = &file_name;
-                        }
-                        extension_node.insert(extension, path);
+                        extension_node.insert(&extension, path);
                     }
                 }
             }
