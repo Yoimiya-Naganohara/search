@@ -171,10 +171,9 @@ impl SearchEngine for Search {
                         .unwrap_or("None")
                         .to_string();
 
-                    if section == &'.'
-                        || file_name_str.starts_with(section.clone())
-                        || section == &'*'
-                    {
+                    if section == &'.' {
+                        extension_node.insert(&extension, path);
+                    } else if file_name_str.starts_with(section.clone()) || section == &'*' {
                         if !file_name_str.starts_with('.') {
                             index.insert(&file_name, path.clone());
                         }
