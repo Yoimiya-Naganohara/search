@@ -92,7 +92,7 @@ impl SearchEngine for Search {
                         .to_str()
                         .unwrap();
                     let path = entry.path();
-                    if extension=="None" {
+                    if extension == "None" {
                         extension = &file_name;
                     }
                     extension_node.insert(extension, path);
