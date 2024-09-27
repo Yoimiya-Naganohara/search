@@ -22,13 +22,13 @@ fn main() {
     ██╔════╝██╔══██║╚════██║   ██║       ╚════██║██╔══╝  ██╔══██║██╔═══╝ ██║     ██╔══██║
     ██║     ██║  ██║███████║   ██║       ███████║███████╗██║  ██║██║  ██╗███████╗██║  ██║
     ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝       ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
-    \r\n Type '#?' for help"
+    \r\n Type ':?' for help"
             .blue()
             .bold()
     );
 
     loop {
-        print!("{}", "Search:".green().bold());
+        print!("{}", "Search ".green().bold());
         std::io::stdout().flush().unwrap();
         let mut display_results = false;
         let mut buf = String::new();
@@ -36,29 +36,41 @@ fn main() {
         buf = buf.trim().to_string();
 
         match buf.as_str() {
-            "#?" => println!("{}", "Commands:\n#C - Change directory\n#Q - Quit\n#U - Update index\n#D - Display results\n#? - Show this help message".yellow()),
-            "#C" => {
+            ":?" => {
+                println!("{}", "Usage:\nFile name - Search for a file (Add '?' to the end of the file name to use a wildcard pattern)\n.extension name - Match file extension\n\nCommands:\n:C - Change directory\n:Q - Quit the application\n:U - Update the index\n:D - Display search results\n:? - Show this help message".yellow());
+                continue;
+            }
+            ":C" => {
                 let pre = path.clone();
                 path.clear();
-                println!("{}", format!("Please enter the new directory path (current: {}). Type '#' to cancel:", pre).yellow());
+                println!(
+                    "{}",
+                    format!(
+                        "Please enter the new directory path (current: {}). Type ':' to cancel:",
+                        pre
+                    )
+                    .yellow()
+                );
                 std::io::stdin().read_line(&mut path).unwrap();
                 path = path.trim().to_string();
-                if path.contains('#') {
+                if path.contains(':') {
                     path = pre;
                 }
                 engine.set_part(path.chars().next().unwrap());
                 continue;
             }
-            "#Q" => return,
-            _ if buf.ends_with("#D") => {
+            ":Q" => return,
+            _ if buf.ends_with(":D") => {
                 display_results = true;
-                buf = buf.trim_end_matches("#D").to_string();
+                buf = buf.trim_end_matches(":D").to_string();
             }
-            "#U" => {
-                println!("{}", "Generating index for the current directory...".yellow());
+            ":U" => {
+                println!(
+                    "{}",
+                    "Generating index for the current directory...".yellow()
+                );
                 let start_time = time::SystemTime::now();
                 engine.generate_index([&path].iter().collect());
-                engine.save_index();
                 let duration = start_time.elapsed().expect("Time went backwards");
                 println!(
                     "{}",
@@ -66,15 +78,16 @@ fn main() {
                         "Index generation complete. Time taken: {:?}. Number of indexed items: {}",
                         duration,
                         engine.indexed()
-                    ).green()
+                    )
+                    .green()
                 );
+                engine.save_index();
                 continue;
             }
-            _ => {
-            }
+            _ => {}
         }
 
-        if buf.contains('#') {
+        if buf.contains(':') {
             println!(
                 "{}",
                 "Undefined action. Please enter a valid command.".red()
@@ -105,16 +118,16 @@ fn main() {
                 for (i, result) in results.iter().enumerate() {
                     println!("{}", format!("{} [{}]", i, result.to_str().unwrap()).cyan());
                 }
-                println!("{}", format!("\r\nType a number between 0 and {} to open the corresponding result (and L to locate), or 'X' to cancel.", results.len() - 1).yellow());
+                println!("{}", format!("\r\nType a number between 0 and {} to open the corresponding result (and l to locate), or 'x' to cancel.", results.len() - 1).yellow());
 
                 loop {
-                    print!("{}", "Open:".green().bold());
+                    print!("{}", "Open ".green().bold());
                     std::io::stdout().flush().unwrap();
                     buf.clear();
                     std::io::stdin().read_line(&mut buf).unwrap();
                     buf = buf.trim().to_string();
                     match buf.as_str() {
-                        buf if buf.contains("L") => {
+                        buf if buf.contains("l") => {
                             let index = buf.trim_matches('L').parse::<usize>();
                             if let Ok(index) = index {
                                 if let Some(dir) = results.get(index) {
@@ -137,7 +150,7 @@ fn main() {
                                 println!("{}", "Invalid input. Please enter a valid number.".red());
                             }
                         }
-                        "X" => {
+                        "x" => {
                             println!("{}", "Exit".yellow());
                             break;
                         }

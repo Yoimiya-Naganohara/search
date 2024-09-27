@@ -25,7 +25,7 @@ pub(crate) trait SearchEngine {
     /// # Returns
     ///
     /// * `Result<&Vec<PathBuf>, ()>` - A result containing a reference to a vector of `PathBuf` if the search is successful, or an error `()` if the keyword is not found.
-    fn search(&mut self, keyword: &String) -> Result<&Vec<PathBuf>, ()>;
+    fn search(&self, keyword: &String) -> Result<Vec<PathBuf>, ()>;
 
     /// Saves the current index to disk.
     fn save_index(&mut self);
@@ -55,7 +55,6 @@ impl SearchEngine for Search {
     fn new() -> Self {
         Search {
             index: Node::new(),
-            search_results: Vec::new(),
             search_part: 'C',
         }
     }
@@ -63,7 +62,7 @@ impl SearchEngine for Search {
     fn generate_index(&mut self, root_dir: PathBuf) {
         self.index.clear();
 
-        fn traverse_directory(index: &mut Node, current_dir: &PathBuf) {
+        fn traverse_directory(index: &mut Node, current_dir: &PathBuf, extension_node: &mut Node) {
             if current_dir.metadata().is_err() || fs::read_dir(&current_dir).is_err() {
                 return;
             }
@@ -72,23 +71,47 @@ impl SearchEngine for Search {
             for entry in entries {
                 let entry = entry.expect("Failed to get entry");
                 if entry.file_type().unwrap().is_dir() {
-                    traverse_directory(index, &entry.path());
+                    traverse_directory(index, &entry.path(), extension_node);
                 } else if entry.file_type().unwrap().is_file() {
                     let file_name = entry.file_name();
                     let file_name_str = file_name.to_str().unwrap();
                     let path = entry.path();
                     index.insert(file_name_str, path);
+
+                    // generate new node based on file extension
+
+                    let path = entry.path();
+                    let extension = path
+                        .extension()
+                        .unwrap_or_else(|| std::ffi::OsStr::new("none"))
+                        .to_str()
+                        .unwrap();
+                    let path = entry.path();
+
+                    extension_node.insert(extension, path);
                 }
             }
         }
-
-        traverse_directory(&mut self.index, &root_dir);
+        let mut node = Node::new();
+        traverse_directory(&mut self.index, &root_dir, &mut node);
+        self.index.add_value('.', node);
     }
 
-    fn search(&mut self, keyword: &String) -> Result<&Vec<PathBuf>, ()> {
-        self.search_results.clear();
-
-        let node = match self.index.get(keyword) {
+    fn search(&self, keyword: &String) -> Result<Vec<PathBuf>, ()> {
+        let mut search_results = Vec::new();
+        if !keyword.ends_with('?') {
+            let node = match self.index.get(&keyword) {
+                Some(x) => x,
+                None => {
+                    return Err(());
+                }
+            };
+            search_results.append(&mut node.val().clone());
+            return Ok(search_results);
+        }
+        let mut keyword = keyword.clone();
+        keyword.pop();
+        let node = match self.index.get(&keyword) {
             Some(x) => x,
             None => {
                 return Err(());
@@ -106,8 +129,8 @@ impl SearchEngine for Search {
             }
         }
 
-        traverse_node(node, &mut self.search_results);
-        Ok(&self.search_results)
+        traverse_node(node, &mut search_results);
+        Ok(search_results)
     }
 
     fn save_index(&mut self) {
@@ -159,7 +182,6 @@ impl SearchEngine for Search {
 
 pub struct Search {
     index: Node,
-    search_results: Vec<PathBuf>,
     search_part: char,
 }
 #[cfg(test)]

@@ -17,11 +17,11 @@ This is a command-line search engine application written in Rust. It allows you 
 
 ## Commands
 
-- `#?` - Show help message
-- `#C` - Change directory
-- `#Q` - Quit the application
-- `#U` - Update the search index for the current directory
-- `#D` - Display search results
+- `:?` - Show help message
+- `:C` - Change directory
+- `:Q` - Quit the application
+- `:U` - Update the search index for the current directory
+- `:D` - Display search results
 
 ## Usage
 
@@ -42,11 +42,11 @@ This is a command-line search engine application written in Rust. It allows you 
    ```
 
 4. **Use the commands**:
-   - Type `#?` to see the list of available commands.
-   - Type `#C` to change the directory.
-   - Type `#Q` to quit the application.
-   - Type `#U` to update the search index.
-   - Type `#D` to display search results.
+   - Type `:?` to see the list of available commands.
+   - Type `:C` to change the directory.
+   - Type `:Q` to quit the application.
+   - Type `:U` to update the search index.
+   - Type `:D` to display search results.
 
 ## Example
 
@@ -59,20 +59,20 @@ $ cargo run
     ██║     ██║  ██║███████║   ██║       ███████║███████╗██║  ██║██║  ██╗███████╗██║  ██║
     ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝       ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
     
-    type #? to get help
+    type :? to get help
 
-Search: #U
+Search: :U
 Generating index for the current directory...
 Index generation complete.
 
-Search: myfile.txt#D
+Search: myfile.txt:D
 Search completed. Time taken: 0.123s. Number of results: 3
 
 0 [C:\Users\example\myfile.txt]
 1 [C:\Users\example\Documents\myfile.txt]
 2 [C:\Users\example\Downloads\myfile.txt]
 
-Type a number between 0 and 2 to open the corresponding result (and L to locate), or 'X' to cancel.
+Type a number between 0 and 2 to open the corresponding result (and l to locate), or 'x' to cancel.
 Open: 1
 ```
 

@@ -65,6 +65,12 @@ pub(crate) trait PathTree {
     ///
     /// A `bool` indicating whether the tree is empty.
     fn is_empty(&self) -> bool;
+    /// Adds a value to the tree at the specified character node.    
+    /// # Arguments
+    ///
+    /// * `ch` - A character representing the node to add the value to.
+    /// * `values` - A `Node` containing the values to be added.
+    fn add_value(&mut self, ch: char, values: Node);
 }
 
 impl PathTree for Node {
@@ -145,6 +151,10 @@ impl PathTree for Node {
 
     fn is_empty(&self) -> bool {
         self.children.is_empty() && self.paths.is_empty()
+    }
+
+    fn add_value(&mut self, ch: char, values: Node) {
+        self.children.insert(ch, values);
     }
 }
 
@@ -242,5 +252,17 @@ mod tests {
             None => return,
         });
         assert_eq!(val[0], path);
+    }
+    #[test]
+    fn test_add_value() {
+        let mut root_node = Node::new();
+        let mut child_node = Node::new();
+        let path = PathBuf::from("/some/path");
+        child_node.insert("key", path.clone());
+
+        root_node.add_value('a', child_node.clone());
+
+        let retrieved_node = root_node.get("a").unwrap();
+        assert_eq!(retrieved_node.get("key").unwrap().paths[0], path);
     }
 }
