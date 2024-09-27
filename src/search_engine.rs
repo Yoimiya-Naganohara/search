@@ -163,7 +163,10 @@ impl SearchEngine for Search {
                     let file_name = entry.file_name();
                     let file_name_str = file_name.to_str().unwrap();
                     let path = entry.path();
-                    if file_name_str.starts_with(section.clone()) || section == &'*' {
+                    if file_name_str.starts_with(section.clone())
+                        || section == &'*'
+                        || section == &'.'
+                    {
                         if !file_name_str.starts_with('.') {
                             index.insert(file_name_str, path);
                         }
