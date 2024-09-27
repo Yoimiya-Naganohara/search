@@ -15,8 +15,8 @@ pub(crate) trait SearchEngine {
     /// # Arguments
     ///
     /// * `root_dir` - A `PathBuf` representing the root directory to index.
-    fn generate_index(&mut self, root_dir: PathBuf);
-
+    /// * `section` - A `&char` representing to update
+    fn generate_index(&mut self, root_dir: PathBuf, section: &char);
     /// Searches for a keyword in the index.
     ///
     /// # Arguments
@@ -58,50 +58,6 @@ impl SearchEngine for Search {
             index: Node::new(),
             search_part: 'C',
         }
-    }
-
-    fn generate_index(&mut self, root_dir: PathBuf) {
-        self.index.clear();
-
-        fn traverse_directory(index: &mut Node, current_dir: &PathBuf, extension_node: &mut Node) {
-            if current_dir.metadata().is_err() || fs::read_dir(&current_dir).is_err() {
-                return;
-            }
-
-            let entries = fs::read_dir(current_dir).expect("Failed to read directory");
-            for entry in entries {
-                let entry = entry.expect("Failed to get entry");
-                if entry.file_type().unwrap().is_dir() {
-                    traverse_directory(index, &entry.path(), extension_node);
-                } else if entry.file_type().unwrap().is_file() {
-                    let file_name = entry.file_name();
-                    let file_name_str = file_name.to_str().unwrap();
-                    let path = entry.path();
-                    if !file_name_str.starts_with('.') {
-                        index.insert(file_name_str, path);
-                    }
-                    let mut file_name = file_name_str.to_string();
-                    file_name.remove(0);
-
-                    // generate new node based on file extension
-
-                    let path = entry.path();
-                    let mut extension = path
-                        .extension()
-                        .unwrap_or(OsStr::new("None"))
-                        .to_str()
-                        .unwrap();
-                    let path = entry.path();
-                    if extension == "None" {
-                        extension = &file_name;
-                    }
-                    extension_node.insert(extension, path);
-                }
-            }
-        }
-        let mut node = Node::new();
-        traverse_directory(&mut self.index, &root_dir, &mut node);
-        self.index.add_value('.', node);
     }
 
     fn search(&self, keyword: &String) -> Result<Vec<PathBuf>, ()> {
@@ -185,6 +141,56 @@ impl SearchEngine for Search {
     fn indexed(&self) -> usize {
         self.index.len()
     }
+
+    fn generate_index(&mut self, root_dir: PathBuf, section: &char) {
+        self.index.clear();
+        fn traverse_directory(
+            index: &mut Node,
+            current_dir: &PathBuf,
+            extension_node: &mut Node,
+            section: &char,
+        ) {
+            if current_dir.metadata().is_err() || fs::read_dir(&current_dir).is_err() {
+                return;
+            }
+
+            let entries = fs::read_dir(current_dir).expect("Failed to read directory");
+            for entry in entries {
+                let entry = entry.expect("Failed to get entry");
+                if entry.file_type().unwrap().is_dir() {
+                    traverse_directory(index, &entry.path(), extension_node, section);
+                } else if entry.file_type().unwrap().is_file() {
+                    let file_name = entry.file_name();
+                    let file_name_str = file_name.to_str().unwrap();
+                    let path = entry.path();
+                    if file_name_str.starts_with(section.clone()) || section == &'*' {
+                        if !file_name_str.starts_with('.') {
+                            index.insert(file_name_str, path);
+                        }
+                        let mut file_name = file_name_str.to_string();
+                        file_name.remove(0);
+
+                        // generate new node based on file extension
+
+                        let path = entry.path();
+                        let mut extension = path
+                            .extension()
+                            .unwrap_or(OsStr::new("None"))
+                            .to_str()
+                            .unwrap();
+                        let path = entry.path();
+                        if extension == "None" {
+                            extension = &file_name;
+                        }
+                        extension_node.insert(extension, path);
+                    }
+                }
+            }
+        }
+        let mut node = Node::new();
+        traverse_directory(&mut self.index, &root_dir, &mut node, section);
+        self.index.add_value('.', node);
+    }
 }
 
 pub struct Search {
@@ -203,7 +209,7 @@ mod tests {
     fn test_generate_index() {
         let mut search = Search::new();
         let test_dir = current_dir().unwrap();
-        search.generate_index(test_dir);
+        search.generate_index(test_dir, &'*');
         assert!(!search.index.is_empty());
     }
 
@@ -211,7 +217,7 @@ mod tests {
     fn test_search() {
         let mut search = Search::new();
         let test_dir = current_dir().unwrap();
-        search.generate_index(test_dir);
+        search.generate_index(test_dir, &'*');
         let keyword = String::from("main.rs");
         let result = search.search(&keyword);
         assert!(result.is_ok());
@@ -222,7 +228,7 @@ mod tests {
     fn test_save_and_load_index() {
         let mut search = Search::new();
         let test_dir = current_dir().unwrap();
-        search.generate_index(test_dir);
+        search.generate_index(test_dir, &'*');
         search.save_index();
 
         let mut new_search = Search::new();

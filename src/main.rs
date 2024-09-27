@@ -37,7 +37,7 @@ fn main() {
 
         match buf.as_str() {
             ":?" => {
-                println!("{}", "Usage:\nFile name - Search for a file (Add '?' to the end of the file name to use a wildcard pattern)\n.extension name - Match file extension\n\nCommands:\n:C - Change directory\n:Q - Quit the application\n:U - Update the index\n:D - Display search results\n:? - Show this help message".yellow());
+                println!("{}", "Usage:\nFile name - Search for a file (Add '?' to the end of the file name to use a wildcard pattern)\n.extension name - Match file extension\n\nCommands:\n:C - Change directory\n:Q - Quit the application\n:U - Update the index (Add '*' to update given section)\n:D - Display search results\n:? - Show this help message".yellow());
                 continue;
             }
             ":C" => {
@@ -64,13 +64,15 @@ fn main() {
                 display_results = true;
                 buf = buf.trim_end_matches(":D").to_string();
             }
-            ":U" => {
+            buf if buf.contains(":U") => {
+                let buf = buf.replace(":U", "");
                 println!(
                     "{}",
                     "Generating index for the current directory...".yellow()
                 );
+
                 let start_time = time::SystemTime::now();
-                engine.generate_index([&path].iter().collect());
+                engine.generate_index([&path].iter().collect(), &buf.chars().next().unwrap_or('*'));
                 let duration = start_time.elapsed().expect("Time went backwards");
                 println!(
                     "{}",
