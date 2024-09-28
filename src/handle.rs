@@ -25,7 +25,7 @@ pub(crate) trait Handler {
 
     fn handler(&mut self);
 
-    fn browse(&self, data: &Vec<PathBuf>, found: &Vec<usize>);
+    fn browse(&self, data: &Vec<PathBuf>, found: &Vec<usize>) -> bool;
 }
 impl Handler for Handle {
     fn new() -> Self {
@@ -238,8 +238,11 @@ $     - Matches the end of the string.
                 for file in data {
                     i += 1;
                     let file_name = file.file_name().unwrap().to_str().unwrap();
-                    if i == data.len() || (counter % 20 == 0 && counter > 0) {
-                        self.browse(data, &found);
+                    if i == data.len() || counter == 20 {
+                        counter = 0;
+                        if self.browse(data, &found) {
+                            return;
+                        };
                     }
                     if !regex.is_match(file_name) {
                         continue;
@@ -260,7 +263,7 @@ $     - Matches the end of the string.
         println!("{}", self.welcome.blue().bold())
     }
 
-    fn browse(&self, data: &Vec<PathBuf>, found: &Vec<usize>) {
+    fn browse(&self, data: &Vec<PathBuf>, found: &Vec<usize>) -> bool {
         println!(
             "{}",
             "Tip: Enter 'q' to quit, 's' to get path, 'l<number>' to open the parent directory of the result, or just the number to open the result.".yellow()
@@ -281,7 +284,7 @@ $     - Matches the end of the string.
                         println!("{}", "Invalid input. Please enter a valid number.".red());
                     }
                 }
-                "q" => return,
+                "q" => return true,
                 _ => {
                     let (buf, p) = if buf.contains('l') {
                         (buf.trim_matches('l').to_string(), true)
@@ -305,5 +308,6 @@ $     - Matches the end of the string.
                 }
             }
         }
+        false
     }
 }
