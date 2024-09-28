@@ -105,6 +105,7 @@ impl eframe::App for SearchApp {
                                 if ui.button("Switch").clicked() {
                                     self.engine
                                         .set_root_dir([self.root_dir.clone()].iter().collect());
+                                    self.engine.load_index();
                                     self.notice_message =
                                         Some("Root directory switched successfully".to_string());
                                 }
