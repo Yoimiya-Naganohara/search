@@ -24,6 +24,8 @@ pub(crate) trait Handler {
     fn handle(&mut self);
 
     fn handler(&mut self);
+
+    fn browse(&self, data: &Vec<PathBuf>, found: &Vec<usize>);
 }
 impl Handler for Handle {
     fn new() -> Self {
@@ -235,50 +237,23 @@ $     - Matches the end of the string.
                 let regex = Regex::new(&self.command).unwrap_or(Regex::new("None").unwrap());
                 for file in data {
                     i += 1;
-                    if !regex.is_match(file.file_name().unwrap().to_str().unwrap()) {
+                    let file_name = file.file_name().unwrap().to_str().unwrap();
+                    if i == data.len() || counter == 20 {
+                        self.browse(data, &found);
+                    }
+                    if !regex.is_match(file_name) {
                         continue;
                     }
-                    println!("{} [{}]", counter, file.to_str().unwrap());
-                    found.insert(counter, i);
-                    counter += 1;
-                    if counter % 20 == 0 || counter == data.len() - 1 {
-                        println!(
-                                "{}",
-                                "Tip: Enter 'q' to quit, 'l<number>' to open the parent directory of the result, or just the number to open the result.".yellow()
-                            );
-                        loop {
-                            let mut buf = String::new();
-                            stdin().read_line(&mut buf).unwrap();
-                            buf = buf.trim().to_string();
-                            let mut p = false;
-                            if buf.is_empty() {
-                                break;
-                            }
-                            if buf == "q" {
-                                return;
-                            }
-                            if buf.contains('l') {
-                                buf = buf.trim_matches('l').to_string();
-                                p = true
-                            }
-                            if let Ok(index) = buf.parse::<usize>() {
-                                if let Some(mut dir) = data.get(found[index]) {
-                                    let path_buf = dir.parent().unwrap().to_path_buf();
-                                    if p {
-                                        dir = &path_buf;
-                                    }
-                                    if let Err(e) = open::that(dir) {
-                                        eprintln!(
-                                            "{}",
-                                            format!("Failed to open directory: {}", e).red()
-                                        );
-                                    }
-                                }
-                            } else {
-                                println!("{}", "Invalid input. Please enter a valid number.".red());
-                            }
-                        }
+                    let re = regex.find(file_name).unwrap();
+                    let highlighted =
+                        file_name.replace(re.as_str(), &format!("{}", re.as_str().green().bold()));
+                    let mut space = String::new();
+                    if counter < 10 {
+                        space = " ".to_string();
                     }
+                    println!("{} {}[{}]", counter, space, highlighted);
+                    found.insert(counter, i - 1);
+                    counter += 1;
                 }
             }
         }
@@ -287,5 +262,52 @@ $     - Matches the end of the string.
     fn welcome(&mut self) {
         self.engine.load_index();
         println!("{}", self.welcome.blue().bold())
+    }
+
+    fn browse(&self, data: &Vec<PathBuf>, found: &Vec<usize>) {
+        println!(
+            "{}",
+            "Tip: Enter 'q' to quit, 's' to get path, 'l<number>' to open the parent directory of the result, or just the number to open the result.".yellow()
+        );
+        loop {
+            let mut buf = String::new();
+            stdin().read_line(&mut buf).unwrap();
+            buf = buf.trim().to_string();
+            match buf.as_str() {
+                "" => break,
+                _ if buf.contains('s') => {
+                    buf = buf.trim_matches('s').to_string();
+                    if let Ok(index) = buf.parse::<usize>() {
+                        if let Some(dir) = data.get(found[index]) {
+                            println!("[{}]", dir.to_str().unwrap());
+                        }
+                    } else {
+                        println!("{}", "Invalid input. Please enter a valid number.".red());
+                    }
+                }
+                "q" => return,
+                _ => {
+                    let (buf, p) = if buf.contains('l') {
+                        (buf.trim_matches('l').to_string(), true)
+                    } else {
+                        (buf, false)
+                    };
+
+                    if let Ok(index) = buf.parse::<usize>() {
+                        if let Some(mut dir) = data.get(found[index]) {
+                            let path_buf = dir.parent().unwrap().to_path_buf();
+                            if p {
+                                dir = &path_buf;
+                            }
+                            if let Err(e) = open::that(dir) {
+                                eprintln!("{}", format!("Failed to open directory: {}", e).red());
+                            }
+                        }
+                    } else {
+                        println!("{}", "Invalid input. Please enter a valid number.".red());
+                    }
+                }
+            }
+        }
     }
 }
