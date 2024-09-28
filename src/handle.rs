@@ -238,7 +238,7 @@ $     - Matches the end of the string.
                 for file in data {
                     i += 1;
                     let file_name = file.file_name().unwrap().to_str().unwrap();
-                    if i == data.len() || counter % 20 == 0 {
+                    if i == data.len() || (counter % 20 == 0 && counter > 0) {
                         self.browse(data, &found);
                     }
                     if !regex.is_match(file_name) {
