@@ -5,7 +5,7 @@ use std::{
 };
 
 use regex::Regex;
-
+#[derive(Clone)]
 pub(crate) struct Search {
     indexed_files: Vec<PathBuf>,
     search_results: Vec<(PathBuf, String)>,
