@@ -8,7 +8,10 @@ use regex::Regex;
 
 pub(crate) struct Search {
     indexed_files: Vec<PathBuf>,
+    search_results: Vec<(PathBuf, String)>,
     root_dir: PathBuf,
+
+    search_results_limit: usize,
 }
 #[allow(dead_code)]
 pub trait SearchEngine {
@@ -19,8 +22,13 @@ pub trait SearchEngine {
     fn get_index(&self) -> &Vec<PathBuf>;
     fn set_root_dir(&mut self, root_dir: PathBuf);
     fn get_root_dir(&self) -> &PathBuf;
-    fn search(&self, key: &String) -> Vec<PathBuf>;
+    fn search(&mut self, key: &str);
+    fn get_results(&self) -> &Vec<(PathBuf, String)>;
+    fn reset_search_results(&mut self);
+    fn set_search_results_limit(&mut self, limit: usize);
+    fn clear_index_files(&mut self);
 }
+
 impl SearchEngine for Search {
     fn generate_index(&mut self) {
         // clear before new index added to indexed_files
@@ -31,26 +39,15 @@ impl SearchEngine for Search {
                 return;
             }
 
-            match read_dir(current_path) {
-                Ok(entries) => {
-                    for entry in entries {
-                        let entry = match entry {
-                            Ok(x) => x,
-                            Err(_) => {
-                                return;
-                            }
-                        };
-
-                        // is dir
+            if let Ok(entries) = read_dir(current_path) {
+                for entry in entries.flatten() {
+                    {
                         if entry.path().is_dir() {
                             traverse_index(&entry.path(), indexed);
                         } else if entry.path().is_file() {
                             indexed.push(entry.path());
                         }
                     }
-                }
-                Err(_) => {
-                    return;
                 }
             }
         }
@@ -62,6 +59,8 @@ impl SearchEngine for Search {
         Search {
             indexed_files: Vec::new(),
             root_dir: PathBuf::from("C:\\"),
+            search_results: Vec::new(),
+            search_results_limit: 200,
         }
     }
 
@@ -98,10 +97,7 @@ impl SearchEngine for Search {
             }
         };
         let reader = BufReader::new(file);
-        self.indexed_files = match bincode::deserialize_from(reader) {
-            Ok(x) => x,
-            Err(_) => Vec::new(),
-        };
+        self.indexed_files = bincode::deserialize_from(reader).unwrap_or_default();
     }
 
     fn get_index(&self) -> &Vec<PathBuf> {
@@ -116,16 +112,37 @@ impl SearchEngine for Search {
         &self.root_dir
     }
 
-    fn search(&self, key: &String) -> Vec<PathBuf> {
-        let mut found = Vec::new();
-        let regex = Regex::new(&key).unwrap_or(Regex::new("None").unwrap());
-
-        for file in &self.indexed_files {
+    fn search(&mut self, key: &str) {
+        let regex = Regex::new(key).unwrap_or(Regex::new("None").unwrap());
+        let mut searched = 0usize;
+        for file in self.indexed_files.iter() {
+            if searched >= self.search_results_limit {
+                break;
+            }
+            let file_name = file.file_name().unwrap().to_str().unwrap();
             if regex.is_match(file.file_name().unwrap().to_str().unwrap()) {
-                found.push(file.clone());
+                if let Some(re) = regex.find(file_name) {
+                    self.search_results
+                        .push((file.clone(), re.as_str().to_string()));
+                    searched += 1;
+                }
             }
         }
-        found
+    }
+    fn get_results(&self) -> &Vec<(PathBuf, String)> {
+        &self.search_results
+    }
+
+    fn reset_search_results(&mut self) {
+        self.search_results.clear();
+    }
+
+    fn set_search_results_limit(&mut self, limit: usize) {
+        self.search_results_limit = limit;
+    }
+
+    fn clear_index_files(&mut self) {
+        self.indexed_files = Vec::new()
     }
 }
 
