@@ -7,6 +7,6 @@ fn main() {
     handler.welcome();
     loop {
         handler.input();
-        handler.handle();
+        handler.handler();
     }
 }
