@@ -1,0 +1,177 @@
+use std::{
+    io::{stdin, Write},
+    path::PathBuf,
+    process::exit,
+    time,
+};
+
+use colored::Colorize;
+
+use crate::search_engine::{Search, SearchEngine};
+
+pub struct Handle {
+    welcome: String,
+    command: String,
+    engine: Search,
+}
+pub(crate) trait Handler {
+    fn new() -> Self;
+
+    fn welcome(&mut self);
+    fn input(&mut self);
+
+    fn handle(&mut self);
+}
+impl Handler for Handle {
+    fn new() -> Self {
+        Handle {
+            welcome: "
+        ███████╗ █████╗ ███████╗████████╗    ███████╗███████╗ █████╗ ██████╗ ███████╗██╗  ██╗
+        ██╔════╝██╔══██╗██╔════╝╚══██╔══╝    ██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝██║  ██║
+        ███████╗███████║███████╗   ██║       ███████╗█████╗  ███████║██████╔╝██║     ███████║
+        ██╔════╝██╔══██║╚════██║   ██║       ╚════██║██╔══╝  ██╔══██║██╔═══╝ ██║     ██╔══██║
+        ██║     ██║  ██║███████║   ██║       ███████║███████╗██║  ██║██║  ██╗███████╗██║  ██║
+        ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝       ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝"
+                .to_string(),
+            command: String::new(),
+            engine: Search::new(),
+        }
+    }
+
+    fn input(&mut self) {
+        print!("{}", ">".green());
+        std::io::stdout().flush().unwrap();
+        self.command.clear();
+        std::io::stdin().read_line(&mut self.command).unwrap();
+        self.command = self.command.trim().to_string();
+    }
+
+    fn handle(&mut self) {
+        match self.command.as_str() {
+            ":?" => {
+                println!("{}", "Usage:
+.     - Matches any character except a newline.
+^     - Matches the start of the string.
+$     - Matches the end of the string.
+*     - Matches 0 or more repetitions of the preceding pattern.
++     - Matches 1 or more repetitions of the preceding pattern.
+?     - Matches 0 or 1 repetition of the preceding pattern.
+{m,n} - Matches from m to n repetitions of the preceding pattern.
+[]    - Matches any single character in the brackets.
+|     - Matches either the pattern before or the pattern after the |.
+()    - Groups patterns.
+\nCommands:\n:C - Change directory\n:Q - Quit the application\n:U - Update the index (Add '*' to update given section)\n:D - Display search results\n:? - Show this help message".yellow());
+            }
+            ":C" => {
+                let mut path = String::new();
+                println!(
+                    "{}",
+                    format!(
+                        "Please enter the new directory path (current: {}). Type ':x' to cancel:",
+                        self.engine.get_root_dir().to_str().unwrap()
+                    )
+                    .yellow()
+                );
+                std::io::stdin().read_line(&mut path).unwrap();
+                path = path.trim().to_string();
+                if path == ":x" {
+                    return;
+                }
+                self.engine.set_root_dir(PathBuf::from(path));
+                self.engine.load_index();
+            }
+            ":Q" => exit(0),
+            ":U" => {
+                println!(
+                    "{}",
+                    "Generating index for the current directory...".yellow()
+                );
+
+                let start_time = time::SystemTime::now();
+                self.engine.generate_index();
+                let duration = start_time.elapsed().expect("Time went backwards");
+                println!(
+                    "{}",
+                    format!(
+                        "Index generation complete. Time taken: {:?}. Number of indexed items: {}",
+                        duration,
+                        self.engine.get_index().len()
+                    )
+                    .green()
+                );
+                self.engine.save_index();
+            }
+            _ => {
+                let start_time = time::SystemTime::now();
+                let data = self.engine.search(&self.command);
+                let duration = start_time.elapsed().expect("Time went backwards");
+
+                println!(
+                    "{}",
+                    format!(
+                        "Search completed. Time taken: {:?}. Number of results: {}\n",
+                        duration,
+                        data.len()
+                    )
+                    .green()
+                );
+                if data.is_empty() {
+                    return;
+                }
+
+                println!(
+                    "{}",
+                    "Tip: Use ':D' to display the search results.".yellow()
+                );
+                let mut buf = String::new();
+                stdin().read_line(&mut buf).unwrap();
+                buf = buf.trim().to_string();
+                if buf == ":D" {
+                    let mut counter = 0usize;
+                    for i in &data {
+                        println!("{} [{}]", counter, i.to_str().unwrap());
+                        counter += 1;
+                    }
+                    loop {
+                        println!(
+                            "{}",
+                            "Tip: Enter 'q' to quit, 'l<number>' to open the parent directory of the result, or just the number to open the result.".yellow()
+                        );
+                        let mut buf = String::new();
+                        stdin().read_line(&mut buf).unwrap();
+                        buf = buf.trim().to_string();
+                        let mut p = false;
+                        if buf == "q" {
+                            return;
+                        }
+                        if buf.contains('l') {
+                            buf = buf.trim_matches('l').to_string();
+                            p = true
+                        }
+                        if let Ok(index) = buf.parse::<usize>() {
+                            if let Some(mut dir) = data.get(index) {
+                                let path_buf = dir.parent().unwrap().to_path_buf();
+                                if p {
+                                    dir = &path_buf;
+                                }
+                                if let Err(e) = open::that(dir) {
+                                    eprintln!(
+                                        "{}",
+                                        format!("Failed to open directory: {}", e).red()
+                                    );
+                                }
+                            }
+                        } else {
+                            println!("{}", "Invalid input. Please enter a valid number.".red());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn welcome(&mut self) {
+        self.engine.load_index();
+        println!("{}", self.welcome.blue().bold())
+    }
+}
