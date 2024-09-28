@@ -238,7 +238,7 @@ $     - Matches the end of the string.
                 for file in data {
                     i += 1;
                     let file_name = file.file_name().unwrap().to_str().unwrap();
-                    if i == data.len() || counter == 20 {
+                    if i == data.len() || counter % 20 == 0 {
                         self.browse(data, &found);
                     }
                     if !regex.is_match(file_name) {
@@ -247,11 +247,7 @@ $     - Matches the end of the string.
                     let re = regex.find(file_name).unwrap();
                     let highlighted =
                         file_name.replace(re.as_str(), &format!("{}", re.as_str().green().bold()));
-                    let mut space = String::new();
-                    if counter < 10 {
-                        space = " ".to_string();
-                    }
-                    println!("{} {}[{}]", counter, space, highlighted);
+                    println!("{} [{}]", counter, highlighted);
                     found.insert(counter, i - 1);
                     counter += 1;
                 }
