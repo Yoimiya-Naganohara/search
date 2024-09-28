@@ -273,7 +273,7 @@ $     - Matches the end of the string.
             stdin().read_line(&mut buf).unwrap();
             buf = buf.trim().to_string();
             match buf.as_str() {
-                "" => break,
+                "" => return true,
                 _ if buf.contains('s') => {
                     buf = buf.trim_matches('s').to_string();
                     if let Ok(index) = buf.parse::<usize>() {
@@ -308,6 +308,7 @@ $     - Matches the end of the string.
                 }
             }
         }
-        false
     }
 }
+
+
