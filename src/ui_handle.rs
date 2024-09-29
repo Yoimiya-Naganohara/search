@@ -50,6 +50,9 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn get(&mut self) {
+        if self.engine.len() == 0 {
+            self.engine.load_index();
+        }
         self.engine.reset_search_results();
         self.engine.search(&self.command);
         self.file_list = self.engine.get_results().clone();

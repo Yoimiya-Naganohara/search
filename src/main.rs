@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod handle;
 mod search_engine;
 
@@ -9,6 +10,8 @@ use std::thread::{self, sleep};
 use std::time::Duration;
 mod ui_handle;
 use ui_handle::{SearchApp, SearchAppEngine};
+
+
 
 fn main() {
     if args().nth(1).is_some() {

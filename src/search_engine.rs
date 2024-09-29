@@ -19,6 +19,7 @@ pub trait SearchEngine {
     fn generate_index(&mut self);
     fn save_index(&self);
     fn load_index(&mut self);
+    fn len(&self) -> usize;
     fn get_index(&self) -> &Vec<PathBuf>;
     fn set_root_dir(&mut self, root_dir: PathBuf);
     fn get_root_dir(&self) -> &PathBuf;
@@ -146,6 +147,10 @@ impl SearchEngine for Search {
 
     fn clear_index_files(&mut self) {
         self.indexed_files = Vec::new()
+    }
+
+    fn len(&self) -> usize {
+        self.indexed_files.len()
     }
 }
 
