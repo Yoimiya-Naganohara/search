@@ -65,6 +65,9 @@ impl SearchEngine for Search {
     }
 
     fn save_index(&self) {
+        if self.indexed_files.is_empty() {
+            return;
+        }
         let file = File::create(format!(
             "index {}",
             self.root_dir
