@@ -1,20 +1,9 @@
 use std::{path::PathBuf, sync::mpsc::Sender};
 
 use crate::search_engine::{Search, SearchEngine};
+use egui::{FontDefinitions, FontFamily};
 
 /// Represents the main application structure for the search functionality.
-///
-/// # Fields
-///
-/// * `command` - A string representing the command to be executed.
-/// * `file_list` - A vector of tuples containing the file path and associated string.
-/// * `engine` - The search engine used for performing search operations.
-/// * `show_dialog` - A boolean indicating whether a dialog should be shown.
-/// * `root_dir` - A string representing the root directory for the search.
-/// * `notice_message` - An optional string for displaying notice messages.
-/// * `sender` - An optional sender for sending messages.
-/// * `is_loading` - A boolean indicating whether the application is currently loading.
-/// * `is_updating` - A boolean indicating whether the application is currently updating.
 pub struct SearchApp {
     command: String,
     file_list: Vec<(PathBuf, String)>,
@@ -42,22 +31,8 @@ impl Default for SearchApp {
         }
     }
 }
+
 /// A trait that defines the core functionalities for a search application engine.
-/// This trait is intended to be implemented by any struct that aims to provide
-/// the necessary UI components and logic for a search application.
-///
-/// # Required Methods
-///
-/// - `render_file_list(&mut self, ui: &mut egui::Ui)`: Renders the list of files in the UI.
-/// - `render_settings_dialog(&mut self, ctx: &egui::Context, ui: &mut egui::Ui)`: Renders the settings dialog in the UI.
-/// - `render_search_bar(&mut self, ui: &mut egui::Ui)`: Renders the search bar in the UI.
-/// - `render_loading(&mut self, ui: &mut egui::Ui)`: Renders a loading indicator in the UI.
-/// - `update_ui(&mut self, ctx: &egui::Context)`: Updates the UI based on the current context.
-/// - `get(&mut self)`: Retrieves data or state from the engine.
-/// - `set_sender(&mut self, send: Sender<String>)`: Sets a sender for communication purposes.
-/// - `new(cc: &eframe::CreationContext<'_>) -> Self`: Creates a new instance of the implementing struct.
-/// - `update_index(&self)`: Updates the search index.
-/// - `verify_index(&mut self)`: Verifies the integrity of the search index.
 pub(crate) trait SearchAppEngine {
     fn render_file_list(&mut self, ui: &mut egui::Ui);
     fn render_settings_dialog(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);
@@ -70,6 +45,7 @@ pub(crate) trait SearchAppEngine {
     fn update_index(&self);
     fn verify_index(&mut self);
 }
+
 impl SearchAppEngine for SearchApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let _ = cc;
@@ -152,34 +128,44 @@ impl SearchAppEngine for SearchApp {
     fn render_file_list(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.set_width(ui.available_width());
-            for (_, (path, matched)) in self.file_list.iter().enumerate() {
+            for (path, matched) in &self.file_list {
+                if matched.is_empty() {
+                    continue;
+                }
                 ui.horizontal(|ui| {
                     let file_name = path.file_name().unwrap().to_str().unwrap();
-                    let file_name_parts: Vec<&str> = file_name.split(matched).collect();
-                    let file_name_left_part = *file_name_parts.first().unwrap();
-                    let file_name_right_part = *file_name_parts.last().unwrap();
+                    let file_name = format!("-{} ", file_name);
                     let default_visuals = ui.visuals().clone();
-                    ui.visuals_mut().override_text_color = Some(default_visuals.text_color());
-                    if ui.link(file_name_left_part).clicked() {
-                        if open::that(path).is_ok() {};
+                    let file_name_parts: Vec<&str> = file_name.split(matched).collect();
+                    let file_path = path.to_str().unwrap();
+                    for i in file_name_parts {
+                        {
+                            let label = ui.label(i);
+                            if label.clicked() && open::that(file_path).is_ok() {}
+                            label
+                                .clone()
+                                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                            ui.add_space(-8.5);
+                            label.on_hover_text(file_path);
+                            if !i.ends_with(' ') {
+                                let matched_label = ui.strong(matched);
+                                if matched_label.clicked() && open::that(file_path).is_ok() {}
+                                matched_label
+                                    .clone()
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                matched_label.on_hover_text(file_path);
+                                ui.add_space(-8.5);
+                            }
+                        }
                     }
                     ui.visuals_mut().override_text_color = Some(default_visuals.hyperlink_color);
-                    if ui.link(matched).clicked() {
-                        if open::that(path).is_ok() {}
-                    }
-                    ui.visuals_mut().override_text_color = Some(default_visuals.text_color());
-                    if ui.link(file_name_right_part).clicked() {
-                        if open::that(path).is_ok() {};
-                    }
                     if !self.command.is_empty() {
-                        let e = ui.small_button("σ");
-                        if e.contains_pointer() {
-                            ui.label(path.to_str().unwrap());
-                        }
-                        if e.clicked() {
-                            let path = path.parent().unwrap();
-                            if open::that(path).is_ok() {}
-                        }
+                        ui.add_space(1.0);
+                        let e = ui
+                            .label("σ")
+                            .on_hover_cursor(egui::CursorIcon::PointingHand);
+                        let path = path.parent().unwrap();
+                        if e.clicked() && open::that(path).is_ok() {}
                     }
                 });
             }
@@ -219,8 +205,6 @@ impl eframe::App for SearchApp {
         self.update_ui(ctx);
     }
 }
-use egui::FontDefinitions;
-use egui::FontFamily;
 
 fn setup_custom_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
