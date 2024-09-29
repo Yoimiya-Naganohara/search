@@ -36,7 +36,6 @@ fn run_gui_mode() {
         native_options,
         Box::new(|cc| {
             let mut app = SearchApp::new(cc);
-            app.init();
             app.set_sender(send);
             start_background_threads(recv);
             Ok(Box::new(app))

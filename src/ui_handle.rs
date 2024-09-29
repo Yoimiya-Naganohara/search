@@ -11,6 +11,7 @@ pub struct SearchApp {
     notice_message: Option<String>,
     sender: Option<Sender<String>>,
     is_loading: bool,
+    is_updating: bool,
 }
 
 impl Default for SearchApp {
@@ -24,6 +25,7 @@ impl Default for SearchApp {
             notice_message: None,
             sender: None,
             is_loading: false,
+            is_updating: false,
         }
     }
 }
@@ -34,11 +36,10 @@ pub(crate) trait SearchAppEngine {
     fn render_loading(&mut self, ui: &mut egui::Ui);
     fn update_ui(&mut self, ctx: &egui::Context);
     fn get(&mut self);
-    fn init(&mut self);
     fn set_sender(&mut self, send: Sender<String>);
     fn new(cc: &eframe::CreationContext<'_>) -> Self;
     fn update_index(&self);
-    fn check_index(&mut self);
+    fn verify_index(&mut self);
 }
 impl SearchAppEngine for SearchApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -48,10 +49,6 @@ impl SearchAppEngine for SearchApp {
 
     fn set_sender(&mut self, send: Sender<String>) {
         self.sender = Some(send);
-    }
-
-    fn init(&mut self) {
-        self.engine.load_index();
     }
 
     fn get(&mut self) {
@@ -98,7 +95,7 @@ impl SearchAppEngine for SearchApp {
         egui::Window::new("Setting")
             .open(&mut self.show_dialog)
             .show(ctx, |ui| {
-                ui.label("Root Path");
+                ui.heading("Root Path");
                 ui.horizontal(|ui| {
                     if ui.text_edit_singleline(&mut self.root_dir).changed() {
                         self.notice_message = None;
@@ -114,7 +111,7 @@ impl SearchAppEngine for SearchApp {
                 if let Some(ref message) = self.notice_message {
                     ui.label(message);
                 }
-                ui.label("Update Index");
+                ui.heading("Update Index");
                 if ui.button("Update Index Immediately").clicked() {
                     if let Some(sender) = &self.sender {
                         let _ = sender.send(self.root_dir.clone());
@@ -166,15 +163,17 @@ impl SearchAppEngine for SearchApp {
         }
     }
 
-    fn check_index(&mut self) {
+    fn verify_index(&mut self) {
         if self.engine.len() == 0 {
-            if self.is_loading {
+            if self.is_loading && !self.is_updating {
+                self.is_updating = true;
                 self.update_index();
             }
             self.engine.load_index();
             self.is_loading = true
         } else {
             self.is_loading = false;
+            self.is_updating = false;
         }
     }
 
@@ -186,7 +185,7 @@ impl SearchAppEngine for SearchApp {
 impl eframe::App for SearchApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _ = frame;
-        self.check_index();
+        self.verify_index();
         self.update_ui(ctx);
     }
 }
