@@ -1,10 +1,7 @@
 #![windows_subsystem = "windows"]
-mod handle;
 mod search_engine;
 
-use handle::{Handle, Handler};
 use search_engine::{Search, SearchEngine};
-use std::env::args;
 use std::sync::mpsc::channel;
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -12,20 +9,7 @@ mod ui_handle;
 use ui_handle::{SearchApp, SearchAppEngine};
 
 fn main() {
-    if args().nth(1).is_some() {
-        run_cli_mode();
-    } else {
-        run_gui_mode();
-    }
-}
-
-fn run_cli_mode() {
-    let mut handler = Handle::new();
-    handler.welcome();
-    loop {
-        handler.input();
-        handler.handler();
-    }
+    run_gui_mode();
 }
 
 fn run_gui_mode() {
