@@ -5,7 +5,7 @@ use crate::search_engine::{Search, SearchEngine};
 /// Represents the main application structure for the search functionality.
 ///
 /// # Fields
-/// 
+///
 /// * `command` - A string representing the command to be executed.
 /// * `file_list` - A vector of tuples containing the file path and associated string.
 /// * `engine` - The search engine used for performing search operations.
@@ -214,7 +214,29 @@ impl SearchAppEngine for SearchApp {
 impl eframe::App for SearchApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _ = frame;
+        setup_custom_fonts(ctx);
         self.verify_index();
         self.update_ui(ctx);
     }
+}
+use egui::FontDefinitions;
+use egui::FontFamily;
+
+fn setup_custom_fonts(ctx: &egui::Context) {
+    let mut fonts = FontDefinitions::default();
+
+    // Load a font that supports Chinese characters
+    fonts.font_data.insert(
+        "my_font".to_owned(),
+        egui::FontData::from_static(include_bytes!("./font/NotoSerifCJKsc-Regular.otf")),
+    );
+
+    // Insert the font into the font family
+    fonts
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .insert(0, "my_font".to_owned());
+
+    ctx.set_fonts(fonts);
 }
