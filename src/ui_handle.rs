@@ -2,6 +2,19 @@ use std::{path::PathBuf, sync::mpsc::Sender};
 
 use crate::search_engine::{Search, SearchEngine};
 
+/// Represents the main application structure for the search functionality.
+///
+/// # Fields
+/// 
+/// * `command` - A string representing the command to be executed.
+/// * `file_list` - A vector of tuples containing the file path and associated string.
+/// * `engine` - The search engine used for performing search operations.
+/// * `show_dialog` - A boolean indicating whether a dialog should be shown.
+/// * `root_dir` - A string representing the root directory for the search.
+/// * `notice_message` - An optional string for displaying notice messages.
+/// * `sender` - An optional sender for sending messages.
+/// * `is_loading` - A boolean indicating whether the application is currently loading.
+/// * `is_updating` - A boolean indicating whether the application is currently updating.
 pub struct SearchApp {
     command: String,
     file_list: Vec<(PathBuf, String)>,
@@ -29,6 +42,22 @@ impl Default for SearchApp {
         }
     }
 }
+/// A trait that defines the core functionalities for a search application engine.
+/// This trait is intended to be implemented by any struct that aims to provide
+/// the necessary UI components and logic for a search application.
+///
+/// # Required Methods
+///
+/// - `render_file_list(&mut self, ui: &mut egui::Ui)`: Renders the list of files in the UI.
+/// - `render_settings_dialog(&mut self, ctx: &egui::Context, ui: &mut egui::Ui)`: Renders the settings dialog in the UI.
+/// - `render_search_bar(&mut self, ui: &mut egui::Ui)`: Renders the search bar in the UI.
+/// - `render_loading(&mut self, ui: &mut egui::Ui)`: Renders a loading indicator in the UI.
+/// - `update_ui(&mut self, ctx: &egui::Context)`: Updates the UI based on the current context.
+/// - `get(&mut self)`: Retrieves data or state from the engine.
+/// - `set_sender(&mut self, send: Sender<String>)`: Sets a sender for communication purposes.
+/// - `new(cc: &eframe::CreationContext<'_>) -> Self`: Creates a new instance of the implementing struct.
+/// - `update_index(&self)`: Updates the search index.
+/// - `verify_index(&mut self)`: Verifies the integrity of the search index.
 pub(crate) trait SearchAppEngine {
     fn render_file_list(&mut self, ui: &mut egui::Ui);
     fn render_settings_dialog(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);

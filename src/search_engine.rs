@@ -6,6 +6,19 @@ use std::{
 
 use regex::Regex;
 #[derive(Clone)]
+/// Represents a search operation within a directory structure.
+///
+/// The `Search` struct holds information about the files that have been indexed,
+/// the results of the search, the root directory where the search is performed,
+/// and a limit on the number of search results.
+///
+/// # Fields
+///
+/// * `indexed_files` - A vector of `PathBuf` representing the files that have been indexed.
+/// * `search_results` - A vector of tuples where each tuple contains a `PathBuf` and a `String`,
+///   representing the file path and the search result respectively.
+/// * `root_dir` - A `PathBuf` representing the root directory where the search is performed.
+/// * `search_results_limit` - A `usize` representing the maximum number of search results to be returned.
 pub(crate) struct Search {
     indexed_files: Vec<PathBuf>,
     search_results: Vec<(PathBuf, String)>,
@@ -14,6 +27,48 @@ pub(crate) struct Search {
     search_results_limit: usize,
 }
 #[allow(dead_code)]
+/// A trait that defines the behavior of a search engine.
+///
+/// # Methods
+///
+/// - `new() -> Self`:
+///   Creates a new instance of the search engine.
+///
+/// - `generate_index(&mut self)`:
+///   Generates the search index.
+///
+/// - `save_index(&self)`:
+///   Saves the current search index to a persistent storage.
+///
+/// - `load_index(&mut self)`:
+///   Loads the search index from persistent storage.
+///
+/// - `len(&self) -> usize`:
+///   Returns the number of items in the search index.
+///
+/// - `get_index(&self) -> &Vec<PathBuf>`:
+///   Returns a reference to the search index.
+///
+/// - `set_root_dir(&mut self, root_dir: PathBuf)`:
+///   Sets the root directory for the search engine.
+///
+/// - `get_root_dir(&self) -> &PathBuf`:
+///   Returns a reference to the root directory of the search engine.
+///
+/// - `search(&mut self, key: &str)`:
+///   Performs a search with the given key.
+///
+/// - `get_results(&self) -> &Vec<(PathBuf, String)>`:
+///   Returns a reference to the search results.
+///
+/// - `reset_search_results(&mut self)`:
+///   Resets the search results.
+///
+/// - `set_search_results_limit(&mut self, limit: usize)`:
+///   Sets a limit on the number of search results.
+///
+/// - `clear_index_files(&mut self)`:
+///   Clears the index files.
 pub trait SearchEngine {
     fn new() -> Self;
     fn generate_index(&mut self);
