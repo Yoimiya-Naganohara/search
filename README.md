@@ -1,99 +1,136 @@
 <div align=center>
 
-[中文](README_CN.md) | [English](README.md)
+ [English](README.md) | [中文](README_CN.md) 
 
 </div>
 
-# Search Engine CLI
+# Search Application
 
-This is a command-line search engine application written in Rust. It allows you to search for files and directories, update the search index, and open or locate search results.
+This is a Rust-based search application that provides both a command-line interface (CLI) and a graphical user interface (GUI) using `egui` and `eframe`. The application indexes files and allows users to search for files based on their content.
 
 ## Features
 
-- **Search**: Search for files and directories.
-- **Update Index**: Generate and save an index for the current directory.
-- **Change Directory**: Change the directory to be indexed and searched.
-- **Open Results**: Open or locate search results directly from the command line.
+- **Command-Line Interface (CLI)**: Allows users to interact with the application via the terminal.
+- **Graphical User Interface (GUI)**: Provides a user-friendly interface for searching files.
+- **Automatic Indexing**: Periodically updates the file index in the background.
+- **Customizable Search**: Users can set the root directory for indexing and perform searches based on file content.
 
-## Commands
+## Installation
 
-- `:?` - Show help message
-- `:C` - Change directory
-- `:Q` - Quit the application
-- `:U` - Update the search index for the current directory
-- `:D` - Display search results
+1. **Clone the repository**:
+    ```sh
+    git clone https://github.com/Yoimiya-Naganohara/search.git
+    cd search
+    ```
+
+2. **Build the application**:
+    ```sh
+    cargo build --release
+    ```
 
 ## Usage
 
-1. **Clone the repository**:
-   ```sh
-   git clone <repository-url>
-   cd <repository-directory>
-   ```
+### Command-Line Interface (CLI)
 
-2. **Build the project**:
-   ```sh
-   cargo build
-   ```
-
-3. **Run the application**:
-   ```sh
-   cargo run
-   ```
-
-4. **Use the commands**:
-   - Type `:?` to see the list of available commands.
-   - Type `:C` to change the directory.
-   - Type `:Q` to quit the application.
-   - Type `:U` to update the search index.
-   - Type `:D` to display search results.
-
-## Example
-
+To run the application in CLI mode, provide any argument when running the executable:
 ```sh
-$ cargo run
-    ███████╗ █████╗ ███████╗████████╗    ███████╗███████╗ █████╗ ██████╗ ███████╗██╗  ██╗
-    ██╔════╝██╔══██╗██╔════╝╚══██╔══╝    ██╔════╝██╔════╝██╔══██╗██╔══██╗██╔════╝██║  ██║
-    ███████╗███████║███████╗   ██║       ███████╗█████╗  ███████║██████╔╝██║     ███████║
-    ██╔════╝██╔══██║╚════██║   ██║       ╚════██║██╔══╝  ██╔══██║██╔═══╝ ██║     ██╔══██║
-    ██║     ██║  ██║███████║   ██║       ███████║███████╗██║  ██║██║  ██╗███████╗██║  ██║
-    ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝       ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
-    
-    type :? to get help
-
-Search: :U
-Generating index for the current directory...
-Index generation complete.
-
-Search: myfile.txt:D
-Search completed. Time taken: 0.123s. Number of results: 3
-
-0 [C:\Users\example\myfile.txt]
-1 [C:\Users\example\Documents\myfile.txt]
-2 [C:\Users\example\Downloads\myfile.txt]
-
-Type a number between 0 and 2 to open the corresponding result (and l to locate), or 'x' to cancel.
-Open: 1
+./target/release/search_terminal some_argument
 ```
 
-## Dependencies
+### Graphical User Interface (GUI)
 
-- [open](https://crates.io/crates/open)
-- [serde](https://crates.io/crates/serde)
-- [bincode](https://crates.io/crates/bincode)
-- [colored](https://crates.io/crates/colored)
+To run the application in GUI mode, simply run the executable without any arguments:
+```sh
+./target/release/search
+```
+
+## Configuration
+
+### Setting the Root Directory
+
+In GUI mode, you can set the root directory for indexing by clicking the "Set" button and entering the desired directory path.
+
+### Automatic Indexing
+
+The application automatically updates the file index every 10 minutes. This is handled by a background thread.
+
+## Code Overview
+
+### main.rs
+
+The [`main.rs`](command:_github.copilot.openRelativePath?%5B%7B%22scheme%22%3A%22file%22%2C%22authority%22%3A%22%22%2C%22path%22%3A%22%2Fd%3A%2Fsearch%2Fsrc%2Fmain.rs%22%2C%22query%22%3A%22%22%2C%22fragment%22%3A%22%22%7D%2C%2266d6ebe7-0450-42af-977c-2ff64ac7f4b4%22%5D "d:\search\src\main.rs") file contains the entry point for the application. 
+
+```rust
+#![windows_subsystem = "windows"]
+mod search_engine;
+
+use search_engine::{Search, SearchEngine};
+use std::sync::mpsc::channel;
+use std::thread::{self, sleep};
+use std::time::Duration;
+mod ui_handle;
+use ui_handle::{SearchApp, SearchAppEngine};
+
+fn main() {
+    run_gui_mode();
+}
+
+fn run_gui_mode() {
+    let (send, recv) = channel();
+    let native_options = eframe::NativeOptions::default();
+    let _ = eframe::run_native(
+        "Search",
+        native_options,
+        Box::new(|cc| {
+            let mut app = SearchApp::new(cc);
+            app.set_sender(send);
+            start_background_threads(recv);
+            Ok(Box::new(app))
+        }),
+    );
+}
+
+fn start_background_threads(recv: std::sync::mpsc::Receiver<String>) {
+    let mut engine = Search::new();
+    thread::spawn(move || loop {
+        if let Ok(received) = recv.recv() {
+            engine.set_root_dir([received].iter().collect());
+            engine.generate_index();
+            engine.save_index();
+            engine.clear_index_files();
+        }
+    });
+
+    let mut engine = Search::new();
+    thread::spawn(move || loop {
+        sleep(Duration::from_secs(600));
+        for path in 'A'..='Z' {
+            engine.set_root_dir([format!("{}:\\", path)].iter().collect());
+            engine.generate_index();
+            engine.save_index();
+            engine.clear_index_files();
+        }
+    });
+}
+```
+
+### search_engine.rs
+
+Contains the implementation of the [`Search`](command:_github.copilot.openSymbolFromReferences?%5B%22%22%2C%5B%7B%22uri%22%3A%7B%22scheme%22%3A%22file%22%2C%22authority%22%3A%22%22%2C%22path%22%3A%22%2Fd%3A%2Fsearch%2Fsrc%2Fmain.rs%22%2C%22query%22%3A%22%22%2C%22fragment%22%3A%22%22%7D%2C%22pos%22%3A%7B%22line%22%3A30%2C%22character%22%3A21%7D%7D%5D%2C%2266d6ebe7-0450-42af-977c-2ff64ac7f4b4%22%5D "Go to definition") and `SearchEngine` structs, which handle file indexing and searching.
+
+### ui_handle.rs
+
+Contains the implementation of the [`SearchApp`](command:_github.copilot.openSymbolFromReferences?%5B%22%22%2C%5B%7B%22uri%22%3A%7B%22scheme%22%3A%22file%22%2C%22authority%22%3A%22%22%2C%22path%22%3A%22%2Fd%3A%2Fsearch%2Fsrc%2Fmain.rs%22%2C%22query%22%3A%22%22%2C%22fragment%22%3A%22%22%7D%2C%22pos%22%3A%7B%22line%22%3A21%2C%22character%22%3A26%7D%7D%5D%2C%2266d6ebe7-0450-42af-977c-2ff64ac7f4b4%22%5D "Go to definition") struct, which handles the GUI logic using `egui` and `eframe`.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License. See the [`LICENSE`](command:_github.copilot.openRelativePath?%5B%7B%22scheme%22%3A%22file%22%2C%22authority%22%3A%22%22%2C%22path%22%3A%22%2Fd%3A%2Fsearch%2FLICENSE%22%2C%22query%22%3A%22%22%2C%22fragment%22%3A%22%22%7D%2C%2266d6ebe7-0450-42af-977c-2ff64ac7f4b4%22%5D "d:\search\LICENSE") file for details.
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+Contributions are welcome! Please open an issue or submit a pull request on GitHub.
 
 ## Acknowledgements
 
-- ASCII art generated using [patorjk.com](http://patorjk.com/software/taag/)
-
-## To do
-- wildcard pattern (may increase memory usage)
+- [egui](https://github.com/emilk/egui) for the GUI framework.
+- [eframe](https://github.com/emilk/eframe) for the application framework.
