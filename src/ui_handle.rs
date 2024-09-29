@@ -10,6 +10,7 @@ pub struct SearchApp {
     root_dir: String,
     notice_message: Option<String>,
     sender: Option<Sender<String>>,
+    is_loading: bool,
 }
 
 impl Default for SearchApp {
@@ -22,6 +23,7 @@ impl Default for SearchApp {
             root_dir: String::from("C:\\"),
             notice_message: None,
             sender: None,
+            is_loading: false,
         }
     }
 }
@@ -29,11 +31,14 @@ pub(crate) trait SearchAppEngine {
     fn render_file_list(&mut self, ui: &mut egui::Ui);
     fn render_settings_dialog(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);
     fn render_search_bar(&mut self, ui: &mut egui::Ui);
+    fn render_loading(&mut self, ui: &mut egui::Ui);
     fn update_ui(&mut self, ctx: &egui::Context);
     fn get(&mut self);
     fn init(&mut self);
     fn set_sender(&mut self, send: Sender<String>);
     fn new(cc: &eframe::CreationContext<'_>) -> Self;
+    fn update_index(&self);
+    fn check_index(&mut self);
 }
 impl SearchAppEngine for SearchApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -50,9 +55,6 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn get(&mut self) {
-        if self.engine.len() == 0 {
-            self.engine.load_index();
-        }
         self.engine.reset_search_results();
         self.engine.search(&self.command);
         self.file_list = self.engine.get_results().clone();
@@ -64,6 +66,9 @@ impl SearchAppEngine for SearchApp {
                 self.render_search_bar(ui);
                 if self.show_dialog {
                     self.render_settings_dialog(ctx, ui);
+                }
+                if self.is_loading {
+                    self.render_loading(ui);
                 }
                 self.render_file_list(ui);
             });
@@ -154,11 +159,34 @@ impl SearchAppEngine for SearchApp {
             }
         });
     }
+
+    fn update_index(&self) {
+        if let Some(sender) = &self.sender {
+            let _ = sender.send(self.root_dir.clone());
+        }
+    }
+
+    fn check_index(&mut self) {
+        if self.engine.len() == 0 {
+            if self.is_loading {
+                self.update_index();
+            }
+            self.engine.load_index();
+            self.is_loading = true
+        } else {
+            self.is_loading = false;
+        }
+    }
+
+    fn render_loading(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Loading...");
+    }
 }
 
 impl eframe::App for SearchApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _ = frame;
+        self.check_index();
         self.update_ui(ctx);
     }
 }

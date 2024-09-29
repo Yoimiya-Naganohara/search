@@ -11,8 +11,6 @@ use std::time::Duration;
 mod ui_handle;
 use ui_handle::{SearchApp, SearchAppEngine};
 
-
-
 fn main() {
     if args().nth(1).is_some() {
         run_cli_mode();
