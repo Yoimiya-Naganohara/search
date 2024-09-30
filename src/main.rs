@@ -1,6 +1,7 @@
 #![windows_subsystem = "windows"]
 mod search_engine;
 
+use egui::{IconData, ViewportBuilder};
 use search_engine::{Search, SearchEngine};
 use std::sync::mpsc::channel;
 use std::thread::{self, sleep};
@@ -14,7 +15,22 @@ fn main() {
 
 fn run_gui_mode() {
     let (send, recv) = channel();
-    let native_options = eframe::NativeOptions::default();
+    let mut icon_data = IconData::default();
+    if let Ok(image_data) = image::ImageReader::open("ico.ico") {
+        if let Ok(e) = image_data.decode() {
+            let rgba = e.as_bytes();
+            icon_data = IconData {
+                rgba: rgba.to_vec(),
+                width: e.width(),
+                height: e.height(),
+            };
+        };
+    };
+    let viewport = ViewportBuilder::default();
+    let native_options = eframe::NativeOptions {
+        viewport: viewport.with_icon(icon_data),
+        ..Default::default()
+    };
     let _ = eframe::run_native(
         "Search",
         native_options,
