@@ -3,12 +3,14 @@ use std::{
     io::{Read, Write},
     ops::AddAssign,
     path::PathBuf,
+    process::Command,
     sync::mpsc::Sender,
     time::{Duration, SystemTime},
 };
 
 use crate::search_engine::{Search, SearchEngine};
-use egui::{FontDefinitions, FontFamily, Key};
+use egui::{FontDefinitions, FontFamily};
+use image::ImageReader;
 
 /// Represents the main application structure for the search functionality.
 pub struct SearchApp {
@@ -84,6 +86,9 @@ impl SearchAppEngine for SearchApp {
 
     fn update_ui(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            if ui.ui_contains_pointer() {
+                self.verify_index();
+            }
             ui.vertical(|ui| {
                 self.render_search_bar(ui);
                 if self.show_dialog {
@@ -108,6 +113,7 @@ impl SearchAppEngine for SearchApp {
                 search_bar.request_focus();
             }
             if search_bar.changed() {
+                self.update_average_time_suspend();
                 self.get();
             }
             if ui.button("Set").clicked() {
@@ -151,10 +157,10 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn render_file_list(&mut self, ui: &mut egui::Ui) {
-        let file_list = self.file_list.clone();
+        // let file_list = self.file_list.clone();
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.set_width(ui.available_width());
-            for (path, matched) in &file_list {
+            for (path, matched) in &self.file_list {
                 if matched.is_empty() {
                     continue;
                 }
@@ -167,9 +173,6 @@ impl SearchAppEngine for SearchApp {
                     for i in file_name_parts {
                         {
                             let label = ui.label(i);
-                            if label.contains_pointer() {
-                                self.update_average_time_suspend();
-                            }
                             if label.clicked() && open::that(file_path).is_ok() {}
                             label
                                 .clone()
@@ -195,8 +198,11 @@ impl SearchAppEngine for SearchApp {
                         let e = ui
                             .label("σ")
                             .on_hover_cursor(egui::CursorIcon::PointingHand);
-                        let path = path.parent().unwrap();
-                        if e.clicked() && open::that_detached(path).is_ok() {}
+                        // let path = path.parent().unwrap();
+                        if e.clicked() {
+                            let _ = Command::new("explorer").arg("/select,").arg(path).spawn();
+                        }
+                        // if e.clicked() && open::that_detached(path).is_ok() {}
                     }
                 });
             }
@@ -243,7 +249,7 @@ impl eframe::App for SearchApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _ = frame;
         setup_custom_fonts(ctx);
-        self.verify_index();
+        // self.verify_index();
         self.update_ui(ctx);
     }
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
