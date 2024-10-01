@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::search_engine::{Search, SearchEngine};
-use egui::{FontDefinitions, FontFamily};
+use egui::{FontDefinitions, FontFamily, Key};
 
 /// Represents the main application structure for the search functionality.
 pub struct SearchApp {
@@ -104,7 +104,9 @@ impl SearchAppEngine for SearchApp {
                     .hint_text("Search")
                     .desired_width(ui.available_width() - 40.0),
             );
-            search_bar.request_focus();
+            if !self.show_dialog {
+                search_bar.request_focus();
+            }
             if search_bar.changed() {
                 self.get();
             }
