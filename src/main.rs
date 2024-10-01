@@ -3,6 +3,8 @@ mod search_engine;
 
 use egui::{IconData, ViewportBuilder};
 use search_engine::{Search, SearchEngine};
+use std::fs::File;
+use std::io::Read;
 use std::sync::mpsc::channel;
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -53,10 +55,15 @@ fn start_background_threads(recv: std::sync::mpsc::Receiver<String>) {
             engine.clear_index_files();
         }
     });
-
+    let mut update_time = 600;
+    if let Ok(mut file) = File::open("updateTime.ini") {
+        let mut buf = String::new();
+        file.read_to_string(&mut buf).unwrap();
+        update_time = buf.parse::<u64>().unwrap_or(600);
+    };
     let mut engine = Search::new();
     thread::spawn(move || loop {
-        sleep(Duration::from_secs(600));
+        sleep(Duration::from_secs(update_time));
         for path in 'A'..='Z' {
             engine.set_root_dir([format!("{}:\\", path)].iter().collect());
             engine.generate_index();

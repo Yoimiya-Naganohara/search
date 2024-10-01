@@ -1,4 +1,11 @@
-use std::{path::PathBuf, sync::mpsc::Sender};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    ops::AddAssign,
+    path::PathBuf,
+    sync::mpsc::Sender,
+    time::{Duration, SystemTime},
+};
 
 use crate::search_engine::{Search, SearchEngine};
 use egui::{FontDefinitions, FontFamily};
@@ -14,10 +21,19 @@ pub struct SearchApp {
     sender: Option<Sender<String>>,
     is_loading: bool,
     is_updating: bool,
+    last_usage_time: SystemTime,
+    current_time: SystemTime,
+    average_suspend_duration: Duration,
 }
 
 impl Default for SearchApp {
     fn default() -> Self {
+        let mut update_time = 600;
+        if let Ok(mut file) = File::open("updateTime.ini") {
+            let mut buf = String::new();
+            file.read_to_string(&mut buf).unwrap();
+            update_time = buf.parse::<u64>().unwrap_or(600);
+        }
         SearchApp {
             command: String::new(),
             file_list: Vec::new(),
@@ -28,6 +44,9 @@ impl Default for SearchApp {
             sender: None,
             is_loading: false,
             is_updating: false,
+            last_usage_time: SystemTime::now(),
+            current_time: SystemTime::now(),
+            average_suspend_duration: Duration::from_secs(update_time),
         }
     }
 }
@@ -44,6 +63,7 @@ pub(crate) trait SearchAppEngine {
     fn new(cc: &eframe::CreationContext<'_>) -> Self;
     fn update_index(&self);
     fn verify_index(&mut self);
+    fn update_average_time_suspend(&mut self);
 }
 
 impl SearchAppEngine for SearchApp {
@@ -117,6 +137,10 @@ impl SearchAppEngine for SearchApp {
                     ui.label(message);
                 }
                 ui.heading("Update Index");
+                ui.label(format!(
+                    "Automatic index update interval: {} seconds",
+                    self.average_suspend_duration.as_secs().to_string()
+                ));
                 if ui.button("Update Index Immediately").clicked() {
                     if let Some(sender) = &self.sender {
                         let _ = sender.send(self.root_dir.clone());
@@ -126,9 +150,10 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn render_file_list(&mut self, ui: &mut egui::Ui) {
+        let file_list = self.file_list.clone();
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.set_width(ui.available_width());
-            for (path, matched) in &self.file_list {
+            for (path, matched) in &file_list {
                 if matched.is_empty() {
                     continue;
                 }
@@ -141,6 +166,9 @@ impl SearchAppEngine for SearchApp {
                     for i in file_name_parts {
                         {
                             let label = ui.label(i);
+                            if label.contains_pointer() {
+                                self.update_average_time_suspend();
+                            }
                             if label.clicked() && open::that(file_path).is_ok() {}
                             label
                                 .clone()
@@ -195,6 +223,17 @@ impl SearchAppEngine for SearchApp {
     fn render_loading(&mut self, ui: &mut egui::Ui) {
         ui.heading("Loading...");
     }
+
+    fn update_average_time_suspend(&mut self) {
+        self.current_time = SystemTime::now();
+        if let Ok(suspend_time) = self.current_time.duration_since(self.last_usage_time) {
+            if suspend_time.as_secs() >= 300 {
+                self.last_usage_time = self.current_time;
+                self.average_suspend_duration.add_assign(suspend_time);
+                self.average_suspend_duration = self.average_suspend_duration.div_f32(2.0);
+            }
+        };
+    }
 }
 
 impl eframe::App for SearchApp {
@@ -203,6 +242,12 @@ impl eframe::App for SearchApp {
         setup_custom_fonts(ctx);
         self.verify_index();
         self.update_ui(ctx);
+    }
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if let Ok(mut file) = File::create("updateTime.ini") {
+            file.write(self.average_suspend_duration.as_secs().to_string().as_bytes())
+                .unwrap();
+        }
     }
 }
 
