@@ -99,14 +99,13 @@ impl SearchAppEngine for SearchApp {
 
     fn render_search_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            if ui
-                .add(
-                    egui::TextEdit::singleline(&mut self.command)
-                        .hint_text("Search")
-                        .desired_width(ui.available_width() - 40.0),
-                )
-                .changed()
-            {
+            let search_bar = ui.add(
+                egui::TextEdit::singleline(&mut self.command)
+                    .hint_text("Search")
+                    .desired_width(ui.available_width() - 40.0),
+            );
+            search_bar.request_focus();
+            if search_bar.changed() {
                 self.get();
             }
             if ui.button("Set").clicked() {
@@ -245,8 +244,13 @@ impl eframe::App for SearchApp {
     }
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         if let Ok(mut file) = File::create("updateTime.ini") {
-            file.write(self.average_suspend_duration.as_secs().to_string().as_bytes())
-                .unwrap();
+            file.write(
+                self.average_suspend_duration
+                    .as_secs()
+                    .to_string()
+                    .as_bytes(),
+            )
+            .unwrap();
         }
     }
 }
