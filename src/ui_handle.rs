@@ -178,7 +178,9 @@ impl SearchAppEngine for SearchApp {
                             label.on_hover_text(file_path);
                             if !i.ends_with(' ') {
                                 let matched_label = ui.strong(matched);
-                                if matched_label.clicked() && open::that(file_path).is_ok() {}
+                                if matched_label.clicked() && open::that_detached(file_path).is_ok()
+                                {
+                                }
                                 matched_label
                                     .clone()
                                     .on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -194,7 +196,7 @@ impl SearchAppEngine for SearchApp {
                             .label("σ")
                             .on_hover_cursor(egui::CursorIcon::PointingHand);
                         let path = path.parent().unwrap();
-                        if e.clicked() && open::that(path).is_ok() {}
+                        if e.clicked() && open::that_detached(path).is_ok() {}
                     }
                 });
             }
