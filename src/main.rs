@@ -8,7 +8,7 @@ use search_engine::{Search, SearchEngine};
 use std::fs::File;
 use std::io::Read;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread::{self};
+use std::thread;
 use std::time::Duration;
 use ui_handle::{SearchApp, SearchAppEngine};
 
@@ -56,19 +56,23 @@ fn start_background_threads(recv: Receiver<String>) {
 
 fn start_search_thread(recv: Receiver<String>, sender: Sender<String>) {
     let mut engine = Search::new();
-    thread::spawn(move || loop {
-        if let Ok(mut received) = recv.recv() {
+    thread::spawn(move || {
+        while let Ok(mut received) = recv.recv() {
             if received.starts_with(':') {
                 received.remove(0);
                 let _ = sender.send(received);
                 continue;
             }
-            engine.set_root_dir([received].iter().collect());
-            engine.generate_index();
-            engine.save_index();
-            engine.clear_index_files();
+            process_search_request(&mut engine, &received);
         }
     });
+}
+
+fn process_search_request(engine: &mut Search, received: &str) {
+    engine.set_root_dir([received.to_string()].iter().collect());
+    engine.generate_index();
+    engine.save_index();
+    engine.clear_index_files();
 }
 
 fn start_update_thread(recv: Receiver<String>) {
@@ -76,19 +80,29 @@ fn start_update_thread(recv: Receiver<String>) {
     let mut update_time = Duration::from_secs(update_time);
 
     let mut engine = Search::new();
-    thread::spawn(move || loop {
-        if let Ok(update_time_s) = recv.recv_timeout(update_time) {
-            let update_time_s = update_time_s.parse::<u64>().unwrap_or(600);
-            update_time = Duration::from_secs(update_time_s);
-            dbg!(update_time);
-        };
-        for path in 'A'..='Z' {
-            engine.set_root_dir([format!("{}:\\", path)].iter().collect());
-            engine.generate_index();
-            engine.save_index();
-            engine.clear_index_files();
+    thread::spawn(move || {
+        loop {
+            if let Ok(update_time_s) = recv.recv_timeout(update_time) {
+                update_time = parse_update_time(&update_time_s);
+            }
+            update_all_drives(&mut engine);
         }
     });
+}
+
+fn parse_update_time(update_time_s: &str) -> Duration {
+    let update_time_s = update_time_s.parse::<u64>().unwrap_or(600);
+    Duration::from_secs(update_time_s)
+}
+
+fn update_all_drives(engine: &mut Search) {
+    for path in 'A'..='Z' {
+        let drive_path = format!("{}:\\", path);
+        engine.set_root_dir([drive_path].iter().collect());
+        engine.generate_index();
+        engine.save_index();
+        engine.clear_index_files();
+    }
 }
 
 fn read_update_time(path: &str) -> Option<u64> {
