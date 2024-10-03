@@ -7,8 +7,8 @@ use egui::{IconData, ViewportBuilder};
 use search_engine::{Search, SearchEngine};
 use std::fs::File;
 use std::io::Read;
-use std::sync::mpsc::{channel, Receiver};
-use std::thread::{self, sleep};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread::{self};
 use std::time::Duration;
 use ui_handle::{SearchApp, SearchAppEngine};
 
@@ -49,14 +49,20 @@ fn load_icon_data(path: &str) -> Option<IconData> {
 }
 
 fn start_background_threads(recv: Receiver<String>) {
-    start_search_thread(recv);
-    start_update_thread();
+    let (sender, receiver) = channel();
+    start_search_thread(recv, sender);
+    start_update_thread(receiver);
 }
 
-fn start_search_thread(recv: Receiver<String>) {
+fn start_search_thread(recv: Receiver<String>, sender: Sender<String>) {
     let mut engine = Search::new();
     thread::spawn(move || loop {
-        if let Ok(received) = recv.recv() {
+        if let Ok(mut received) = recv.recv() {
+            if received.starts_with(':') {
+                received.remove(0);
+                let _ = sender.send(received);
+                continue;
+            }
             engine.set_root_dir([received].iter().collect());
             engine.generate_index();
             engine.save_index();
@@ -65,12 +71,17 @@ fn start_search_thread(recv: Receiver<String>) {
     });
 }
 
-fn start_update_thread() {
-    let mut update_time = read_update_time("updateTime.ini").unwrap_or(600);
+fn start_update_thread(recv: Receiver<String>) {
+    let update_time = read_update_time("updateTime.ini").unwrap_or(600);
+    let mut update_time = Duration::from_secs(update_time);
+
     let mut engine = Search::new();
     thread::spawn(move || loop {
-        sleep(Duration::from_secs(update_time));
-        update_time = read_update_time("updateTime.ini").unwrap_or(600);
+        if let Ok(update_time_s) = recv.recv_timeout(update_time) {
+            let update_time_s = update_time_s.parse::<u64>().unwrap_or(600);
+            update_time = Duration::from_secs(update_time_s);
+            dbg!(update_time);
+        };
         for path in 'A'..='Z' {
             engine.set_root_dir([format!("{}:\\", path)].iter().collect());
             engine.generate_index();

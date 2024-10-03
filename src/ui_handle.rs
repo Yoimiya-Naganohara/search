@@ -240,6 +240,12 @@ impl SearchAppEngine for SearchApp {
                 self.last_usage_time = self.current_time;
                 self.average_suspend_duration.add_assign(suspend_time);
                 self.average_suspend_duration = self.average_suspend_duration.div_f32(2.0);
+                if let Some(sender) = &self.sender {
+                    let _ = sender.send(format!(
+                        ":{}",
+                        self.average_suspend_duration.as_secs().to_string()
+                    ));
+                }
             }
         };
     }
