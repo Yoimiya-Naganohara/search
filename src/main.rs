@@ -82,14 +82,17 @@ fn start_update_thread(recv: Receiver<String>) {
     let mut engine = Search::new();
     thread::spawn(move || loop {
         if let Ok(update_time_s) = recv.recv_timeout(update_time) {
-            update_time = parse_update_time(&update_time_s);
+            update_time = parse_update_time(&update_time_s, update_time.as_secs());
+            if update_time_s.is_empty() {
+                update_time = update_time.mul_f64(2.0);
+            }
         }
         update_all_drives(&mut engine);
     });
 }
 
-fn parse_update_time(update_time_s: &str) -> Duration {
-    let update_time_s = update_time_s.parse::<u64>().unwrap_or(600);
+fn parse_update_time(update_time_s: &str, prev: u64) -> Duration {
+    let update_time_s = update_time_s.parse::<u64>().unwrap_or(prev);
     Duration::from_secs(update_time_s)
 }
 
