@@ -30,7 +30,7 @@ fn run_gui_mode() {
         native_options,
         Box::new(|cc| {
             let mut app = SearchApp::new(cc);
-            app.set_sender(send);
+            app.set_message_sender(send);
             start_background_threads(recv);
             Ok(Box::new(app))
         }),
@@ -80,13 +80,11 @@ fn start_update_thread(recv: Receiver<String>) {
     let mut update_time = Duration::from_secs(update_time);
 
     let mut engine = Search::new();
-    thread::spawn(move || {
-        loop {
-            if let Ok(update_time_s) = recv.recv_timeout(update_time) {
-                update_time = parse_update_time(&update_time_s);
-            }
-            update_all_drives(&mut engine);
+    thread::spawn(move || loop {
+        if let Ok(update_time_s) = recv.recv_timeout(update_time) {
+            update_time = parse_update_time(&update_time_s);
         }
+        update_all_drives(&mut engine);
     });
 }
 

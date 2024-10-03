@@ -14,58 +14,58 @@ use image::ImageReader;
 
 /// Represents the main application structure for the search functionality.
 pub struct SearchApp {
-    command: String,
-    file_list: Vec<(PathBuf, String)>,
-    engine: Search,
-    show_dialog: bool,
-    root_dir: String,
-    notice_message: Option<String>,
-    sender: Option<Sender<String>>,
-    is_loading: bool,
-    is_updating: bool,
-    last_usage_time: SystemTime,
-    current_time: SystemTime,
-    average_suspend_duration: Duration,
+    search_command: String,
+    search_results: Vec<(PathBuf, String)>,
+    search_engine: Search,
+    display_dialog: bool,
+    root_directory: String,
+    notification_message: Option<String>,
+    message_sender: Option<Sender<String>>,
+    loading_status: bool,
+    updating_status: bool,
+    last_active_time: SystemTime,
+    current_active_time: SystemTime,
+    avg_suspend_duration: Duration,
 }
 
 impl Default for SearchApp {
     fn default() -> Self {
-        let mut update_time = 600;
+        let mut update_interval = 600;
         if let Ok(mut file) = File::open("updateTime.ini") {
-            let mut buf = String::new();
-            file.read_to_string(&mut buf).unwrap();
-            update_time = buf.parse::<u64>().unwrap_or(600);
+            let mut buffer = String::new();
+            file.read_to_string(&mut buffer).unwrap();
+            update_interval = buffer.parse::<u64>().unwrap_or(600);
         }
         SearchApp {
-            command: String::new(),
-            file_list: Vec::new(),
-            engine: Search::new(),
-            show_dialog: false,
-            root_dir: String::from("C:\\"),
-            notice_message: None,
-            sender: None,
-            is_loading: false,
-            is_updating: false,
-            last_usage_time: SystemTime::now(),
-            current_time: SystemTime::now(),
-            average_suspend_duration: Duration::from_secs(update_time),
+            search_command: String::new(),
+            search_results: Vec::new(),
+            search_engine: Search::new(),
+            display_dialog: false,
+            root_directory: String::from("C:\\"),
+            notification_message: None,
+            message_sender: None,
+            loading_status: false,
+            updating_status: false,
+            last_active_time: SystemTime::now(),
+            current_active_time: SystemTime::now(),
+            avg_suspend_duration: Duration::from_secs(update_interval),
         }
     }
 }
 
 /// A trait that defines the core functionalities for a search application engine.
 pub(crate) trait SearchAppEngine {
-    fn render_file_list(&mut self, ui: &mut egui::Ui);
-    fn render_settings_dialog(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);
-    fn render_search_bar(&mut self, ui: &mut egui::Ui);
-    fn render_loading(&mut self, ui: &mut egui::Ui);
-    fn update_ui(&mut self, ctx: &egui::Context);
-    fn get(&mut self);
-    fn set_sender(&mut self, send: Sender<String>);
+    fn render_results_list(&mut self, ui: &mut egui::Ui);
+    fn render_settings_window(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);
+    fn render_search_input(&mut self, ui: &mut egui::Ui);
+    fn render_loading_status(&mut self, ui: &mut egui::Ui);
+    fn update_interface(&mut self, ctx: &egui::Context);
+    fn execute_search(&mut self);
+    fn set_message_sender(&mut self, sender: Sender<String>);
     fn new(cc: &eframe::CreationContext<'_>) -> Self;
-    fn update_index(&self);
-    fn verify_index(&mut self);
-    fn update_average_time_suspend(&mut self);
+    fn refresh_index(&self);
+    fn validate_index(&mut self);
+    fn update_avg_suspend_duration(&mut self);
 }
 
 impl SearchAppEngine for SearchApp {
@@ -74,93 +74,92 @@ impl SearchAppEngine for SearchApp {
         Self::default()
     }
 
-    fn set_sender(&mut self, send: Sender<String>) {
-        self.sender = Some(send);
+    fn set_message_sender(&mut self, sender: Sender<String>) {
+        self.message_sender = Some(sender);
     }
 
-    fn get(&mut self) {
-        self.engine.reset_search_results();
-        self.engine.search(&self.command);
-        self.file_list = self.engine.get_results().clone();
+    fn execute_search(&mut self) {
+        self.search_engine.reset_search_results();
+        self.search_engine.search(&self.search_command);
+        self.search_results = self.search_engine.get_results().clone();
     }
 
-    fn update_ui(&mut self, ctx: &egui::Context) {
+    fn update_interface(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             if ui.ui_contains_pointer() {
-                self.verify_index();
+                self.validate_index();
             }
             ui.vertical(|ui| {
-                self.render_search_bar(ui);
-                if self.show_dialog {
-                    self.render_settings_dialog(ctx, ui);
+                self.render_search_input(ui);
+                if self.display_dialog {
+                    self.render_settings_window(ctx, ui);
                 }
-                if self.is_loading {
-                    self.render_loading(ui);
+                if self.loading_status {
+                    self.render_loading_status(ui);
                 }
-                self.render_file_list(ui);
+                self.render_results_list(ui);
             });
         });
     }
 
-    fn render_search_bar(&mut self, ui: &mut egui::Ui) {
+    fn render_search_input(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            let search_bar = ui.add(
-                egui::TextEdit::singleline(&mut self.command)
+            let search_input = ui.add(
+                egui::TextEdit::singleline(&mut self.search_command)
                     .hint_text("Search")
                     .desired_width(ui.available_width() - 40.0),
             );
-            if !self.show_dialog {
-                search_bar.request_focus();
+            if !self.display_dialog {
+                search_input.request_focus();
             }
-            if search_bar.changed() {
-                self.update_average_time_suspend();
-                self.get();
+            if search_input.changed() {
+                self.update_avg_suspend_duration();
+                self.execute_search();
             }
             if ui.button("Set").clicked() {
-                self.show_dialog = true;
+                self.display_dialog = true;
             }
         });
     }
 
-    fn render_settings_dialog(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    fn render_settings_window(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         let _ = ui;
         egui::Window::new("Setting")
-            .open(&mut self.show_dialog)
+            .open(&mut self.display_dialog)
             .show(ctx, |ui| {
                 ui.heading("Root Path");
                 ui.horizontal(|ui| {
-                    if ui.text_edit_singleline(&mut self.root_dir).changed() {
-                        self.notice_message = None;
+                    if ui.text_edit_singleline(&mut self.root_directory).changed() {
+                        self.notification_message = None;
                     }
                     if ui.button("Switch").clicked() {
-                        self.engine
-                            .set_root_dir([self.root_dir.clone()].iter().collect());
-                        self.engine.load_index();
-                        self.notice_message =
+                        self.search_engine
+                            .set_root_dir([self.root_directory.clone()].iter().collect());
+                        self.search_engine.load_index();
+                        self.notification_message =
                             Some("Root directory switched successfully".to_string());
                     }
                 });
-                if let Some(ref message) = self.notice_message {
+                if let Some(ref message) = self.notification_message {
                     ui.label(message);
                 }
                 ui.heading("Update Index");
                 ui.label(format!(
                     "Automatic index update interval: {} seconds",
-                    self.average_suspend_duration.as_secs().to_string()
+                    self.avg_suspend_duration.as_secs().to_string()
                 ));
                 if ui.button("Update Index Immediately").clicked() {
-                    if let Some(sender) = &self.sender {
-                        let _ = sender.send(self.root_dir.clone());
+                    if let Some(sender) = &self.message_sender {
+                        let _ = sender.send(self.root_directory.clone());
                     }
                 }
             });
     }
 
-    fn render_file_list(&mut self, ui: &mut egui::Ui) {
-        // let file_list = self.file_list.clone();
+    fn render_results_list(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.set_width(ui.available_width());
-            for (path, matched) in &self.file_list {
+            for (path, matched) in &self.search_results {
                 if matched.is_empty() {
                     continue;
                 }
@@ -170,16 +169,16 @@ impl SearchAppEngine for SearchApp {
                     let default_visuals = ui.visuals().clone();
                     let file_name_parts: Vec<&str> = file_name.split(matched).collect();
                     let file_path = path.to_str().unwrap();
-                    for i in file_name_parts {
+                    for part in file_name_parts {
                         {
-                            let label = ui.label(i);
+                            let label = ui.label(part);
                             if label.clicked() && open::that(file_path).is_ok() {}
                             label
                                 .clone()
                                 .on_hover_cursor(egui::CursorIcon::PointingHand);
                             ui.add_space(-8.5);
                             label.on_hover_text(file_path);
-                            if !i.ends_with(' ') {
+                            if !part.ends_with(' ') {
                                 let matched_label = ui.strong(matched);
                                 if matched_label.clicked() && open::that_detached(file_path).is_ok()
                                 {
@@ -193,57 +192,55 @@ impl SearchAppEngine for SearchApp {
                         }
                     }
                     ui.visuals_mut().override_text_color = Some(default_visuals.hyperlink_color);
-                    if !self.command.is_empty() {
+                    if !self.search_command.is_empty() {
                         ui.add_space(1.0);
-                        let e = ui
+                        let explorer_button = ui
                             .label("σ")
                             .on_hover_cursor(egui::CursorIcon::PointingHand);
-                        // let path = path.parent().unwrap();
-                        if e.clicked() {
+                        if explorer_button.clicked() {
                             let _ = Command::new("explorer").arg("/select,").arg(path).spawn();
                         }
-                        // if e.clicked() && open::that_detached(path).is_ok() {}
                     }
                 });
             }
         });
     }
 
-    fn update_index(&self) {
-        if let Some(sender) = &self.sender {
-            let _ = sender.send(self.root_dir.clone());
+    fn refresh_index(&self) {
+        if let Some(sender) = &self.message_sender {
+            let _ = sender.send(self.root_directory.clone());
         }
     }
 
-    fn verify_index(&mut self) {
-        if self.engine.len() == 0 {
-            if self.is_loading && !self.is_updating {
-                self.is_updating = true;
-                self.update_index();
+    fn validate_index(&mut self) {
+        if self.search_engine.len() == 0 {
+            if self.loading_status && !self.updating_status {
+                self.updating_status = true;
+                self.refresh_index();
             }
-            self.engine.load_index();
-            self.is_loading = true
+            self.search_engine.load_index();
+            self.loading_status = true
         } else {
-            self.is_loading = false;
-            self.is_updating = false;
+            self.loading_status = false;
+            self.updating_status = false;
         }
     }
 
-    fn render_loading(&mut self, ui: &mut egui::Ui) {
+    fn render_loading_status(&mut self, ui: &mut egui::Ui) {
         ui.heading("Loading...");
     }
 
-    fn update_average_time_suspend(&mut self) {
-        self.current_time = SystemTime::now();
-        if let Ok(suspend_time) = self.current_time.duration_since(self.last_usage_time) {
-            if suspend_time.as_secs() >= 300 {
-                self.last_usage_time = self.current_time;
-                self.average_suspend_duration.add_assign(suspend_time);
-                self.average_suspend_duration = self.average_suspend_duration.div_f32(2.0);
-                if let Some(sender) = &self.sender {
+    fn update_avg_suspend_duration(&mut self) {
+        self.current_active_time = SystemTime::now();
+        if let Ok(suspend_duration) = self.current_active_time.duration_since(self.last_active_time) {
+            if suspend_duration.as_secs() >= 300 {
+                self.last_active_time = self.current_active_time;
+                self.avg_suspend_duration.add_assign(suspend_duration);
+                self.avg_suspend_duration = self.avg_suspend_duration.div_f32(2.0);
+                if let Some(sender) = &self.message_sender {
                     let _ = sender.send(format!(
                         ":{}",
-                        self.average_suspend_duration.as_secs().to_string()
+                        self.avg_suspend_duration.as_secs().to_string()
                     ));
                 }
             }
@@ -255,13 +252,12 @@ impl eframe::App for SearchApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _ = frame;
         setup_custom_fonts(ctx);
-        // self.verify_index();
-        self.update_ui(ctx);
+        self.update_interface(ctx);
     }
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         if let Ok(mut file) = File::create("updateTime.ini") {
             file.write(
-                self.average_suspend_duration
+                self.avg_suspend_duration
                     .as_secs()
                     .to_string()
                     .as_bytes(),
