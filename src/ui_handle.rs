@@ -10,7 +10,6 @@ use std::{
 
 use crate::search_engine::{Search, SearchEngine};
 use egui::{FontDefinitions, FontFamily};
-use image::ImageReader;
 
 /// Represents the main application structure for the search functionality.
 pub struct SearchApp {
