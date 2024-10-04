@@ -8,7 +8,7 @@ use search_engine::{Search, SearchEngine};
 use std::fs::File;
 use std::io::Read;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
+use std::thread::{self, sleep};
 use std::time::Duration;
 use ui_handle::{SearchApp, SearchAppEngine};
 
@@ -81,7 +81,8 @@ fn start_update_thread(recv: Receiver<String>) {
 
     let mut engine = Search::new();
     thread::spawn(move || loop {
-        if let Ok(update_time_s) = recv.recv_timeout(update_time) {
+        sleep(update_time.div_f64(1.25));
+        if let Ok(update_time_s) = recv.recv_timeout(update_time.div_f64(5.0)) {
             update_time = parse_update_time(&update_time_s, update_time.as_secs());
             if update_time_s.is_empty() {
                 update_time = update_time.mul_f64(2.0);
