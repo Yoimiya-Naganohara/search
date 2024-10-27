@@ -171,7 +171,7 @@ impl SearchAppEngine for SearchApp {
                     for part in file_name_parts {
                         {
                             let label = ui.label(part);
-                            if label.clicked() && open::that(file_path).is_ok() {}
+                            if label.clicked() && open::that_detached(file_path).is_ok() {}
                             label
                                 .clone()
                                 .on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -212,6 +212,9 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn validate_index(&mut self) {
+        if self.search_engine.is_index_modified() {
+            self.search_engine.load_index();
+        }
         if self.search_engine.len() == 0 {
             if self.loading_status && !self.updating_status {
                 self.updating_status = true;
@@ -231,7 +234,10 @@ impl SearchAppEngine for SearchApp {
 
     fn update_avg_suspend_duration(&mut self) {
         self.current_active_time = SystemTime::now();
-        if let Ok(suspend_duration) = self.current_active_time.duration_since(self.last_active_time) {
+        if let Ok(suspend_duration) = self
+            .current_active_time
+            .duration_since(self.last_active_time)
+        {
             if suspend_duration.as_secs() >= 300 {
                 self.last_active_time = self.current_active_time;
                 self.avg_suspend_duration.add_assign(suspend_duration);
@@ -255,13 +261,8 @@ impl eframe::App for SearchApp {
     }
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         if let Ok(mut file) = File::create("updateTime.ini") {
-            file.write(
-                self.avg_suspend_duration
-                    .as_secs()
-                    .to_string()
-                    .as_bytes(),
-            )
-            .unwrap();
+            file.write(self.avg_suspend_duration.as_secs().to_string().as_bytes())
+                .unwrap();
         }
     }
 }

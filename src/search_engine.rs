@@ -1,7 +1,8 @@
 use std::{
-    fs::{read_dir, File},
+    fs::{self, read_dir, File},
     io::{BufReader, BufWriter},
     path::PathBuf,
+    time::SystemTime,
 };
 
 use regex::Regex;
@@ -23,7 +24,7 @@ pub(crate) struct Search {
     indexed_files: Vec<PathBuf>,
     search_results: Vec<(PathBuf, String)>,
     root_dir: PathBuf,
-
+    last_modify_time: std::time::SystemTime,
     search_results_limit: usize,
 }
 #[allow(dead_code)]
@@ -77,6 +78,7 @@ pub trait SearchEngine {
     fn len(&self) -> usize;
     fn get_index(&self) -> &Vec<PathBuf>;
     fn set_root_dir(&mut self, root_dir: PathBuf);
+    fn is_index_modified(&mut self) -> bool;
     fn get_root_dir(&self) -> &PathBuf;
     fn search(&mut self, key: &str);
     fn get_results(&self) -> &Vec<(PathBuf, String)>;
@@ -116,6 +118,7 @@ impl SearchEngine for Search {
             indexed_files: Vec::new(),
             root_dir: PathBuf::from("C:\\"),
             search_results: Vec::new(),
+            last_modify_time: (SystemTime::now()),
             search_results_limit: 200,
         }
     }
@@ -206,6 +209,25 @@ impl SearchEngine for Search {
 
     fn len(&self) -> usize {
         self.indexed_files.len()
+    }
+
+    fn is_index_modified(&mut self) -> bool {
+        if let Ok(info) = fs::metadata(format!(
+            "index {}",
+            self.root_dir
+                .to_str()
+                .unwrap_or_default()
+                .replace("\\", "")
+                .replace(":", "")
+        )) {
+            if let Ok(time) = info.modified() {
+                if self.last_modify_time != time {
+                    self.last_modify_time = time;
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 
