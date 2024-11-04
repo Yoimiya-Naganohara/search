@@ -1,8 +1,5 @@
 mod engine;
-use std::{
-    path::PathBuf,
-    sync::mpsc::Receiver,
-};
+use std::{path::PathBuf, sync::mpsc::Receiver};
 
 use engine::{Search, SearchEngine};
 pub fn start_search_engine(
@@ -10,7 +7,6 @@ pub fn start_search_engine(
     sender: std::sync::Arc<std::sync::Mutex<Vec<(PathBuf, String)>>>,
 ) {
     let mut search_engine = Search::new();
-
     loop {
         if search_engine.get_index().is_empty() {
             search_engine.load_index();
@@ -18,7 +14,7 @@ pub fn start_search_engine(
                 search_engine.generate_index();
             }
         }
-        if let Ok(msg) = recv.try_recv() {
+        if let Ok(msg) = recv.recv() {
             match dbg!(msg).as_str() {
                 "UpdateIndex" => {
                     search_engine.generate_index();
@@ -43,7 +39,11 @@ pub fn start_search_engine(
 }
 #[cfg(test)]
 mod tests {
-    use std::{sync::{mpsc, Arc, Mutex}, thread, time::Duration};
+    use std::{
+        sync::{mpsc, Arc, Mutex},
+        thread,
+        time::Duration,
+    };
 
     use super::*;
 
