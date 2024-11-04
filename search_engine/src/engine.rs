@@ -6,20 +6,8 @@ use std::{
 };
 
 use regex::Regex;
+
 #[derive(Clone)]
-/// Represents a search operation within a directory structure.
-///
-/// The `Search` struct holds information about the files that have been indexed,
-/// the results of the search, the root directory where the search is performed,
-/// and a limit on the number of search results.
-///
-/// # Fields
-///
-/// * `indexed_files` - A vector of `PathBuf` representing the files that have been indexed.
-/// * `search_results` - A vector of tuples where each tuple contains a `PathBuf` and a `String`,
-///   representing the file path and the search result respectively.
-/// * `root_dir` - A `PathBuf` representing the root directory where the search is performed.
-/// * `search_results_limit` - A `usize` representing the maximum number of search results to be returned.
 pub(crate) struct Search {
     indexed_files: Vec<PathBuf>,
     search_results: Vec<(PathBuf, String)>,
@@ -28,68 +16,35 @@ pub(crate) struct Search {
     search_results_limit: usize,
 }
 #[allow(dead_code)]
-/// A trait that defines the behavior of a search engine.
-///
-/// # Methods
-///
-/// - `new() -> Self`:
-///   Creates a new instance of the search engine.
-///
-/// - `generate_index(&mut self)`:
-///   Generates the search index.
-///
-/// - `save_index(&self)`:
-///   Saves the current search index to a persistent storage.
-///
-/// - `load_index(&mut self)`:
-///   Loads the search index from persistent storage.
-///
-/// - `len(&self) -> usize`:
-///   Returns the number of items in the search index.
-///
-/// - `get_index(&self) -> &Vec<PathBuf>`:
-///   Returns a reference to the search index.
-///
-/// - `set_root_dir(&mut self, root_dir: PathBuf)`:
-///   Sets the root directory for the search engine.
-///
-/// - `get_root_dir(&self) -> &PathBuf`:
-///   Returns a reference to the root directory of the search engine.
-///
-/// - `search(&mut self, key: &str)`:
-///   Performs a search with the given key.
-///
-/// - `get_results(&self) -> &Vec<(PathBuf, String)>`:
-///   Returns a reference to the search results.
-///
-/// - `reset_search_results(&mut self)`:
-///   Resets the search results.
-///
-/// - `set_search_results_limit(&mut self, limit: usize)`:
-///   Sets a limit on the number of search results.
-///
-/// - `clear_index_files(&mut self)`:
-///   Clears the index files.
 pub trait SearchEngine {
-    fn new() -> Self;
-    fn generate_index(&mut self);
-    fn save_index(&self);
-    fn load_index(&mut self);
-    fn len(&self) -> usize;
-    fn get_index(&self) -> &Vec<PathBuf>;
-    fn set_root_dir(&mut self, root_dir: PathBuf);
-    fn is_index_modified(&mut self) -> bool;
-    fn get_root_dir(&self) -> &PathBuf;
-    fn search(&mut self, key: &str);
-    fn get_results(&self) -> &Vec<(PathBuf, String)>;
-    fn reset_search_results(&mut self);
-    fn set_search_results_limit(&mut self, limit: usize);
     fn clear_index_files(&mut self);
+    fn generate_index(&mut self);
+    fn get_index(&self) -> &Vec<PathBuf>;
+    fn get_results(&self) -> &Vec<(PathBuf, String)>;
+    fn get_root_dir(&self) -> &PathBuf;
+    fn is_index_modified(&mut self) -> bool;
+    fn len(&self) -> usize;
+    fn load_index(&mut self);
+    fn new() -> Self;
+    fn reset_search_results(&mut self);
+    fn save_index(&self);
+    fn search(&mut self, key: &str);
+    fn set_root_dir(&mut self, root_dir: PathBuf);
+    fn set_search_results_limit(&mut self, limit: usize);
 }
 
 impl SearchEngine for Search {
+    fn new() -> Self {
+        Search {
+            indexed_files: Vec::new(),
+            root_dir: PathBuf::from("C:\\"),
+            search_results: Vec::new(),
+            last_modify_time: SystemTime::now(),
+            search_results_limit: 200,
+        }
+    }
+
     fn generate_index(&mut self) {
-        // clear before new index added to indexed_files
         self.indexed_files.clear();
 
         fn traverse_index(current_path: &PathBuf, indexed: &mut Vec<PathBuf>) {
@@ -99,28 +54,16 @@ impl SearchEngine for Search {
 
             if let Ok(entries) = read_dir(current_path) {
                 for entry in entries.flatten() {
-                    {
-                        if entry.path().is_dir() {
-                            traverse_index(&entry.path(), indexed);
-                        } else if entry.path().is_file() {
-                            indexed.push(entry.path());
-                        }
+                    if entry.path().is_dir() {
+                        traverse_index(&entry.path(), indexed);
+                    } else if entry.path().is_file() {
+                        indexed.push(entry.path());
                     }
                 }
             }
         }
 
         traverse_index(&self.root_dir, &mut self.indexed_files);
-    }
-
-    fn new() -> Self {
-        Search {
-            indexed_files: Vec::new(),
-            root_dir: PathBuf::from("C:\\"),
-            search_results: Vec::new(),
-            last_modify_time: (SystemTime::now()),
-            search_results_limit: 200,
-        }
     }
 
     fn save_index(&self) {
@@ -162,12 +105,35 @@ impl SearchEngine for Search {
         self.indexed_files = bincode::deserialize_from(reader).unwrap_or_default();
     }
 
+    fn len(&self) -> usize {
+        self.indexed_files.len()
+    }
+
     fn get_index(&self) -> &Vec<PathBuf> {
         &self.indexed_files
     }
 
     fn set_root_dir(&mut self, root_dir: PathBuf) {
         self.root_dir = root_dir;
+    }
+
+    fn is_index_modified(&mut self) -> bool {
+        if let Ok(info) = fs::metadata(format!(
+            "index {}",
+            self.root_dir
+                .to_str()
+                .unwrap_or_default()
+                .replace("\\", "")
+                .replace(":", "")
+        )) {
+            if let Ok(time) = info.modified() {
+                if self.last_modify_time != time {
+                    self.last_modify_time = time;
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn get_root_dir(&self) -> &PathBuf {
@@ -191,6 +157,7 @@ impl SearchEngine for Search {
             }
         }
     }
+
     fn get_results(&self) -> &Vec<(PathBuf, String)> {
         &self.search_results
     }
@@ -205,29 +172,6 @@ impl SearchEngine for Search {
 
     fn clear_index_files(&mut self) {
         self.indexed_files = Vec::new()
-    }
-
-    fn len(&self) -> usize {
-        self.indexed_files.len()
-    }
-
-    fn is_index_modified(&mut self) -> bool {
-        if let Ok(info) = fs::metadata(format!(
-            "index {}",
-            self.root_dir
-                .to_str()
-                .unwrap_or_default()
-                .replace("\\", "")
-                .replace(":", "")
-        )) {
-            if let Ok(time) = info.modified() {
-                if self.last_modify_time != time {
-                    self.last_modify_time = time;
-                    return true;
-                }
-            }
-        }
-        false
     }
 }
 

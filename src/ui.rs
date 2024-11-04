@@ -4,24 +4,21 @@ use std::{
     ops::AddAssign,
     path::PathBuf,
     process::Command,
-    sync::mpsc::Sender,
+    sync::{mpsc::Sender, Arc, Mutex},
     time::{Duration, SystemTime},
 };
 
-use crate::search_engine::{Search, SearchEngine};
 use egui::{FontDefinitions, FontFamily};
 
 /// Represents the main application structure for the search functionality.
 pub struct SearchApp {
     search_command: String,
-    search_results: Vec<(PathBuf, String)>,
-    search_engine: Search,
     display_dialog: bool,
     root_directory: String,
     notification_message: Option<String>,
     message_sender: Option<Sender<String>>,
+    message_receiver: Option<Arc<Mutex<Vec<(PathBuf, String)>>>>,
     loading_status: bool,
-    updating_status: bool,
     last_active_time: SystemTime,
     current_active_time: SystemTime,
     avg_suspend_duration: Duration,
@@ -29,22 +26,24 @@ pub struct SearchApp {
 
 impl Default for SearchApp {
     fn default() -> Self {
-        let mut update_interval = 600;
-        if let Ok(mut file) = File::open("updateTime.ini") {
-            let mut buffer = String::new();
-            file.read_to_string(&mut buffer).unwrap();
-            update_interval = buffer.parse::<u64>().unwrap_or(600);
-        }
+        let update_interval = File::open("updateTime.ini")
+            .and_then(|mut file| {
+                let mut buffer = String::new();
+                file.read_to_string(&mut buffer)?;
+                buffer.parse::<u64>().map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid update interval")
+                })
+            })
+            .unwrap_or(600);
+
         SearchApp {
             search_command: String::new(),
-            search_results: Vec::new(),
-            search_engine: Search::new(),
             display_dialog: false,
             root_directory: String::from("C:\\"),
             notification_message: None,
             message_sender: None,
+            message_receiver: None,
             loading_status: false,
-            updating_status: false,
             last_active_time: SystemTime::now(),
             current_active_time: SystemTime::now(),
             avg_suspend_duration: Duration::from_secs(update_interval),
@@ -61,9 +60,9 @@ pub(crate) trait SearchAppEngine {
     fn update_interface(&mut self, ctx: &egui::Context);
     fn execute_search(&mut self);
     fn set_message_sender(&mut self, sender: Sender<String>);
+    fn set_message_receiver(&mut self, receiver: Arc<Mutex<Vec<(PathBuf, String)>>>);
     fn new(cc: &eframe::CreationContext<'_>) -> Self;
     fn refresh_index(&self);
-    fn validate_index(&mut self);
     fn update_avg_suspend_duration(&mut self);
 }
 
@@ -78,16 +77,16 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn execute_search(&mut self) {
-        self.search_engine.reset_search_results();
-        self.search_engine.search(&self.search_command);
-        self.search_results = self.search_engine.get_results().clone();
+        if let Some(msg_sender) = &self.message_sender {
+            msg_sender
+                .send(format!("Search:{}", self.search_command))
+                .unwrap();
+        }
     }
 
     fn update_interface(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            if ui.ui_contains_pointer() {
-                self.validate_index();
-            }
+            if ui.ui_contains_pointer() {}
             ui.vertical(|ui| {
                 self.render_search_input(ui);
                 if self.display_dialog {
@@ -96,7 +95,9 @@ impl SearchAppEngine for SearchApp {
                 if self.loading_status {
                     self.render_loading_status(ui);
                 }
-                self.render_results_list(ui);
+                if !self.search_command.is_empty() {
+                    self.render_results_list(ui);
+                }
             });
         });
     }
@@ -122,7 +123,6 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn render_settings_window(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-        let _ = ui;
         egui::Window::new("Setting")
             .open(&mut self.display_dialog)
             .show(ctx, |ui| {
@@ -132,9 +132,9 @@ impl SearchAppEngine for SearchApp {
                         self.notification_message = None;
                     }
                     if ui.button("Switch").clicked() {
-                        self.search_engine
-                            .set_root_dir([self.root_directory.clone()].iter().collect());
-                        self.search_engine.load_index();
+                        if let Some(sender) = &self.message_sender {
+                            let _ = sender.send(format!("SetRootDir:{}", self.root_directory));
+                        }
                         self.notification_message =
                             Some("Root directory switched successfully".to_string());
                     }
@@ -149,7 +149,7 @@ impl SearchAppEngine for SearchApp {
                 ));
                 if ui.button("Update Index Immediately").clicked() {
                     if let Some(sender) = &self.message_sender {
-                        let _ = sender.send(self.root_directory.clone());
+                        let _ = sender.send("UpdateIndex".to_string());
                     }
                 }
             });
@@ -158,49 +158,56 @@ impl SearchAppEngine for SearchApp {
     fn render_results_list(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.set_width(ui.available_width());
-            for (path, matched) in &self.search_results {
-                if matched.is_empty() {
-                    continue;
-                }
-                ui.horizontal(|ui| {
-                    let file_name = path.file_name().unwrap().to_str().unwrap();
-                    let file_name = format!("-{} ", file_name);
-                    let default_visuals = ui.visuals().clone();
-                    let file_name_parts: Vec<&str> = file_name.split(matched).collect();
-                    let file_path = path.to_str().unwrap();
-                    for part in file_name_parts {
-                        {
-                            let label = ui.label(part);
-                            if label.clicked() && open::that_detached(file_path).is_ok() {}
-                            label
-                                .clone()
-                                .on_hover_cursor(egui::CursorIcon::PointingHand);
-                            ui.add_space(-8.5);
-                            label.on_hover_text(file_path);
-                            if !part.ends_with(' ') {
-                                let matched_label = ui.strong(matched);
-                                if matched_label.clicked() && open::that_detached(file_path).is_ok()
+            if let Some(receiver) = &self.message_receiver {
+                if let Ok(msg) = receiver.lock() {
+                    for (path, matched) in msg.iter() {
+                        if matched.is_empty() {
+                            continue;
+                        }
+                        ui.horizontal(|ui| {
+                            let file_name = path.file_name().unwrap().to_str().unwrap();
+                            let file_name = format!("-{} ", file_name);
+                            let default_visuals = ui.visuals().clone();
+                            let file_name_parts: Vec<&str> = file_name.split(matched).collect();
+                            let file_path = path.to_str().unwrap();
+                            for part in file_name_parts {
                                 {
+                                    let label = ui.label(part);
+                                    if label.clicked() && open::that_detached(file_path).is_ok() {}
+                                    label
+                                        .clone()
+                                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                    ui.add_space(-8.5);
+                                    label.on_hover_text(file_path);
+                                    if !part.ends_with(' ') {
+                                        let matched_label = ui.strong(matched);
+                                        if matched_label.clicked()
+                                            && open::that_detached(file_path).is_ok()
+                                        {
+                                        }
+                                        matched_label
+                                            .clone()
+                                            .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                        matched_label.on_hover_text(file_path);
+                                        ui.add_space(-8.5);
+                                    }
                                 }
-                                matched_label
-                                    .clone()
-                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
-                                matched_label.on_hover_text(file_path);
-                                ui.add_space(-8.5);
                             }
-                        }
+                            ui.visuals_mut().override_text_color =
+                                Some(default_visuals.hyperlink_color);
+                            if !self.search_command.is_empty() {
+                                ui.add_space(1.0);
+                                let explorer_button = ui
+                                    .label("σ")
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                if explorer_button.clicked() {
+                                    let _ =
+                                        Command::new("explorer").arg("/select,").arg(path).spawn();
+                                }
+                            }
+                        });
                     }
-                    ui.visuals_mut().override_text_color = Some(default_visuals.hyperlink_color);
-                    if !self.search_command.is_empty() {
-                        ui.add_space(1.0);
-                        let explorer_button = ui
-                            .label("σ")
-                            .on_hover_cursor(egui::CursorIcon::PointingHand);
-                        if explorer_button.clicked() {
-                            let _ = Command::new("explorer").arg("/select,").arg(path).spawn();
-                        }
-                    }
-                });
+                }
             }
         });
     }
@@ -208,23 +215,6 @@ impl SearchAppEngine for SearchApp {
     fn refresh_index(&self) {
         if let Some(sender) = &self.message_sender {
             let _ = sender.send(self.root_directory.clone());
-        }
-    }
-
-    fn validate_index(&mut self) {
-        if self.search_engine.is_index_modified() {
-            self.search_engine.load_index();
-        }
-        if self.search_engine.len() == 0 {
-            if self.loading_status && !self.updating_status {
-                self.updating_status = true;
-                self.refresh_index();
-            }
-            self.search_engine.load_index();
-            self.loading_status = true
-        } else {
-            self.loading_status = false;
-            self.updating_status = false;
         }
     }
 
@@ -238,6 +228,11 @@ impl SearchAppEngine for SearchApp {
             .current_active_time
             .duration_since(self.last_active_time)
         {
+            if suspend_duration.as_secs() >= self.avg_suspend_duration.as_secs() {
+                if let Some(sender) = &self.message_sender {
+                    sender.send("UpdateIndex".to_string()).unwrap();
+                }
+            }
             if suspend_duration.as_secs() >= 300 {
                 self.last_active_time = self.current_active_time;
                 self.avg_suspend_duration.add_assign(suspend_duration);
@@ -251,11 +246,24 @@ impl SearchAppEngine for SearchApp {
             }
         };
     }
+
+    fn set_message_receiver(&mut self, receiver: Arc<Mutex<Vec<(PathBuf, String)>>>) {
+        self.message_receiver = Some(receiver);
+    }
 }
 
 impl eframe::App for SearchApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _ = frame;
+        if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
+            if let Some(receiver) = &self.message_receiver {
+                if let Ok(msg) = receiver.lock() {
+                    if let Some((path, _)) = msg.first() {
+                        let _ = open::that_detached(path);
+                    }
+                }
+            }
+        }
         setup_custom_fonts(ctx);
         self.update_interface(ctx);
     }
