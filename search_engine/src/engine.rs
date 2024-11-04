@@ -45,7 +45,7 @@ impl SearchEngine for Search {
     }
 
     fn generate_index(&mut self) {
-        self.indexed_files.clear();
+        let mut indexed_files=Vec::new();
 
         fn traverse_index(current_path: &PathBuf, indexed: &mut Vec<PathBuf>) {
             if current_path.metadata().is_err() {
@@ -63,7 +63,8 @@ impl SearchEngine for Search {
             }
         }
 
-        traverse_index(&self.root_dir, &mut self.indexed_files);
+        traverse_index(&self.root_dir, &mut indexed_files);
+        self.indexed_files=indexed_files;
     }
 
     fn save_index(&self) {

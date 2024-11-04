@@ -1,5 +1,5 @@
 mod engine;
-use std::{path::PathBuf, sync::mpsc::Receiver};
+use std::{path::PathBuf, sync::mpsc::Receiver, thread};
 
 use engine::{Search, SearchEngine};
 pub fn start_search_engine(
@@ -12,12 +12,20 @@ pub fn start_search_engine(
             search_engine.load_index();
             if search_engine.get_index().is_empty() {
                 search_engine.generate_index();
+                search_engine.save_index();
             }
         }
         if let Ok(msg) = recv.recv() {
             match dbg!(msg).as_str() {
                 "UpdateIndex" => {
-                    search_engine.generate_index();
+                    let mut search_engine_clone = search_engine.clone();
+                    thread::spawn(move || {
+                        search_engine_clone.generate_index();
+                        search_engine_clone.save_index();
+                        search_engine_clone.clear_index_files();
+                    });
+                    search_engine.clear_index_files();
+                    search_engine.load_index();
                 }
                 msg if msg.starts_with("Search:") => {
                     let msg = msg.trim_start_matches("Search:");
@@ -56,7 +64,6 @@ mod tests {
         thread::spawn(move || {
             start_search_engine(rx, results_clone);
         });
-
         tx.send("UpdateIndex".to_string()).unwrap();
         thread::sleep(Duration::from_secs(1));
 
@@ -74,9 +81,9 @@ mod tests {
             start_search_engine(rx, results_clone);
         });
 
-        tx.send("Search:test".to_string()).unwrap();
+        tx.send("Search:.".to_string()).unwrap();
         thread::sleep(Duration::from_secs(1));
-
+        
         let results = results.lock().unwrap();
         assert!(!results.is_empty());
     }
