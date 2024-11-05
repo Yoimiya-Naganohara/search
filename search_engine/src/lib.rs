@@ -23,7 +23,7 @@ pub fn start_search_engine(
 fn initialize_search_engine(search_engine: &mut Search) {
     search_engine.load_partition();
     search_engine.load_index();
-    if search_engine.get_index().is_empty() {
+    if search_engine.get_index().is_empty()||search_engine.get_partition().is_empty() {
         search_engine.generate_index();
         search_engine.save_partition();
         search_engine.save_index();
