@@ -3,11 +3,8 @@
 mod ui;
 
 use egui::{IconData, ViewportBuilder};
-use std::fs::File;
-use std::io::Read;
 use std::sync::mpsc::channel;
 use std::thread::{self};
-use std::time::Duration;
 use ui::{SearchApp, SearchAppEngine};
 
 fn main() {
@@ -49,16 +46,4 @@ fn load_icon_data(path: &str) -> Option<IconData> {
         width: image.width(),
         height: image.height(),
     })
-}
-
-fn parse_update_time(update_time_s: &str, prev: u64) -> Duration {
-    let update_time_s = update_time_s.parse::<u64>().unwrap_or(prev);
-    Duration::from_secs(update_time_s)
-}
-
-fn read_update_time(path: &str) -> Option<u64> {
-    let mut file = File::open(path).ok()?;
-    let mut buf = String::new();
-    file.read_to_string(&mut buf).ok()?;
-    buf.trim().parse::<u64>().ok()
 }

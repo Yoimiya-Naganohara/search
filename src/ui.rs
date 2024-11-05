@@ -62,7 +62,6 @@ pub(crate) trait SearchAppEngine {
     fn set_message_sender(&mut self, sender: Sender<String>);
     fn set_message_receiver(&mut self, receiver: Arc<Mutex<Vec<(PathBuf, String)>>>);
     fn new(cc: &eframe::CreationContext<'_>) -> Self;
-    fn refresh_index(&self);
     fn update_avg_suspend_duration(&mut self);
 }
 
@@ -78,9 +77,16 @@ impl SearchAppEngine for SearchApp {
 
     fn execute_search(&mut self) {
         if let Some(msg_sender) = &self.message_sender {
-            msg_sender
-                .send(format!("Search:{}", self.search_command))
-                .unwrap();
+            if self.search_command.starts_with(':') {
+                let search_command = self.search_command.trim_start_matches(':');
+                msg_sender
+                    .send(format!("SearchRegex:{}", search_command))
+                    .unwrap();
+            } else {
+                msg_sender
+                    .send(format!("Search:{}", self.search_command))
+                    .unwrap();
+            }
         }
     }
 
@@ -123,6 +129,7 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn render_settings_window(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+        let _ = ui;
         egui::Window::new("Setting")
             .open(&mut self.display_dialog)
             .show(ctx, |ui| {
@@ -210,12 +217,6 @@ impl SearchAppEngine for SearchApp {
                 }
             }
         });
-    }
-
-    fn refresh_index(&self) {
-        if let Some(sender) = &self.message_sender {
-            let _ = sender.send(self.root_directory.clone());
-        }
     }
 
     fn render_loading_status(&mut self, ui: &mut egui::Ui) {
