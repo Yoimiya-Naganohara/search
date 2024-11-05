@@ -8,6 +8,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use clipboard::ClipboardProvider;
 use egui::{FontDefinitions, FontFamily};
 
 /// Represents the main application structure for the search functionality.
@@ -180,6 +181,12 @@ impl SearchAppEngine for SearchApp {
                             for part in file_name_parts {
                                 {
                                     let label = ui.label(part);
+                                    if label.clicked_by(egui::PointerButton::Secondary) {
+                                        let clipboard = clipboard::ClipboardContext::new();
+                                        if let Ok(mut clipboard) = clipboard {
+                                            clipboard.set_contents(file_name.clone()).unwrap();
+                                        }
+                                    }
                                     if label.clicked() && open::that_detached(file_path).is_ok() {}
                                     label
                                         .clone()
@@ -191,6 +198,13 @@ impl SearchAppEngine for SearchApp {
                                         if matched_label.clicked()
                                             && open::that_detached(file_path).is_ok()
                                         {
+                                        }
+                                        if matched_label.clicked_by(egui::PointerButton::Secondary)
+                                        {
+                                            let clipboard = clipboard::ClipboardContext::new();
+                                            if let Ok(mut clipboard) = clipboard {
+                                                clipboard.set_contents(file_name.clone()).unwrap();
+                                            }
                                         }
                                         matched_label
                                             .clone()
@@ -207,6 +221,16 @@ impl SearchAppEngine for SearchApp {
                                 let explorer_button = ui
                                     .label("σ")
                                     .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                if explorer_button.clicked_by(egui::PointerButton::Secondary) {
+                                    let clipboard = clipboard::ClipboardContext::new();
+                                    if let Ok(mut clipboard) = clipboard {
+                                        clipboard
+                                            .set_contents(
+                                                path.to_str().unwrap_or_default().to_string(),
+                                            )
+                                            .unwrap();
+                                    }
+                                }
                                 if explorer_button.clicked() {
                                     let _ =
                                         Command::new("explorer").arg("/select,").arg(path).spawn();
