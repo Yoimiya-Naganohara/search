@@ -11,11 +11,11 @@ use regex::Regex;
 #[derive(Clone)]
 pub(crate) struct Search {
     indexed_files: Vec<PathBuf>,
-    search_results: Vec<(PathBuf, String)>,
-    root_dir: PathBuf,
     last_modify_time: SystemTime,
-    search_results_limit: usize,
     partition: HashMap<char, usize>,
+    root_dir: PathBuf,
+    search_results: Vec<(PathBuf, String)>,
+    search_results_limit: usize,
 }
 
 #[allow(dead_code)]
@@ -41,18 +41,12 @@ pub trait SearchEngine {
 }
 
 impl SearchEngine for Search {
-    fn new() -> Self {
-        Search {
-            indexed_files: Vec::new(),
-            root_dir: PathBuf::from("C:\\"),
-            search_results: Vec::new(),
-            last_modify_time: SystemTime::now(),
-            search_results_limit: 200,
-            partition: HashMap::new(),
-        }
+    fn clear_index_files(&mut self) {
+        self.indexed_files.clear();
     }
 
     fn generate_index(&mut self) {
+        self.clear_indexed_files();
         fn traverse_index(current_path: &PathBuf, indexed: &mut Vec<PathBuf>) {
             if current_path.metadata().is_err() {
                 return;
@@ -69,11 +63,10 @@ impl SearchEngine for Search {
             }
         }
 
-        let mut indexed_files = Vec::new();
-        traverse_index(&self.root_dir, &mut indexed_files);
-        indexed_files.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
-
-        for (i, path) in indexed_files.iter().enumerate() {
+        traverse_index(&self.root_dir, &mut self.indexed_files);
+        self.indexed_files
+            .sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+        for (i, path) in self.indexed_files.iter().enumerate() {
             let k = path
                 .file_name()
                 .unwrap_or_default()
@@ -86,41 +79,45 @@ impl SearchEngine for Search {
         }
 
         self.partition.shrink_to_fit();
-        indexed_files.shrink_to_fit();
-        self.indexed_files = indexed_files;
+        self.indexed_files.shrink_to_fit();
     }
 
-    fn save_index(&self) {
-        if self.indexed_files.is_empty() {
-            return;
+    fn get_index(&self) -> &Vec<PathBuf> {
+        &self.indexed_files
+    }
+
+    fn get_results(&self) -> &Vec<(PathBuf, String)> {
+        &self.search_results
+    }
+
+    fn get_root_dir(&self) -> &PathBuf {
+        &self.root_dir
+    }
+
+    fn get_partition(&self) -> &HashMap<char, usize> {
+        &self.partition
+    }
+
+    fn is_index_modified(&mut self) -> bool {
+        let file_path = self.get_index_file_path();
+
+        if let Ok(info) = fs::metadata(file_path) {
+            if let Ok(time) = info.modified() {
+                if self.last_modify_time != time {
+                    self.last_modify_time = time;
+                    return true;
+                }
+            }
         }
+        false
+    }
 
-        let file_path = format!(
-            "index {}",
-            self.root_dir
-                .to_str()
-                .unwrap_or_default()
-                .replace("\\", "")
-                .replace(":", "")
-        );
-
-        let file = File::create(file_path).expect("Fail to create file");
-        let writer = BufWriter::new(file);
-
-        if let Err(e) = bincode::serialize_into(writer, &self.indexed_files) {
-            eprintln!("Failed to serialize index: {}", e);
-        }
+    fn len(&self) -> usize {
+        self.indexed_files.len()
     }
 
     fn load_index(&mut self) {
-        let file_path = format!(
-            "index {}",
-            self.root_dir
-                .to_str()
-                .unwrap_or_default()
-                .replace("\\", "")
-                .replace(":", "")
-        );
+        let file_path = self.get_index_file_path();
 
         let file = match File::open(file_path) {
             Ok(file) => file,
@@ -134,41 +131,91 @@ impl SearchEngine for Search {
         self.indexed_files = bincode::deserialize_from(reader).unwrap_or_default();
     }
 
-    fn len(&self) -> usize {
-        self.indexed_files.len()
+    fn new() -> Self {
+        Search {
+            indexed_files: Vec::new(),
+            root_dir: PathBuf::from("C:\\"),
+            search_results: Vec::new(),
+            last_modify_time: SystemTime::now(),
+            search_results_limit: 200,
+            partition: HashMap::new(),
+        }
     }
 
-    fn get_index(&self) -> &Vec<PathBuf> {
-        &self.indexed_files
+    fn reset_search_results(&mut self) {
+        self.search_results.clear();
     }
 
-    fn set_root_dir(&mut self, root_dir: PathBuf) {
-        self.root_dir = root_dir;
+    fn save_index(&self) {
+        if self.indexed_files.is_empty() {
+            return;
+        }
+
+        let file_path = self.get_index_file_path();
+
+        let file = File::create(file_path).expect("Fail to create file");
+        let writer = BufWriter::new(file);
+
+        if let Err(e) = bincode::serialize_into(writer, &self.indexed_files) {
+            eprintln!("Failed to serialize index: {}", e);
+        }
     }
 
-    fn is_index_modified(&mut self) -> bool {
-        let file_path = format!(
-            "index {}",
-            self.root_dir
-                .to_str()
-                .unwrap_or_default()
-                .replace("\\", "")
-                .replace(":", "")
-        );
+    fn save_partition(&self) {
+        if self.partition.is_empty() {
+            return;
+        }
 
-        if let Ok(info) = fs::metadata(file_path) {
-            if let Ok(time) = info.modified() {
-                if self.last_modify_time != time {
-                    self.last_modify_time = time;
-                    return true;
-                }
+        let file_path = self.get_partition_path();
+
+        let file = File::create(file_path).expect("Fail to create file");
+        let writer = BufWriter::new(file);
+
+        if let Err(e) = bincode::serialize_into(writer, &self.partition) {
+            eprintln!("Failed to serialize partition: {}", e);
+        }
+    }
+
+    fn load_partition(&mut self) {
+        let file_path = self.get_partition_path();
+
+        let file = match File::open(file_path) {
+            Ok(file) => file,
+            Err(_) => {
+                self.partition = HashMap::new();
+                return;
+            }
+        };
+
+        let reader = BufReader::new(file);
+        self.partition = bincode::deserialize_from(reader).unwrap_or_default();
+    }
+
+    fn search(&mut self, key: &str) {
+        self.search_results.clear();
+        let mut searched = 0usize;
+        let start = self
+            .partition
+            .get(&key.chars().nth(0).unwrap_or_default())
+            .cloned()
+            .unwrap_or(0);
+        let end = self.indexed_files.len();
+
+        for i in start..end {
+            let file = &self.indexed_files[i];
+            let file_name = file.file_name().unwrap().to_str().unwrap();
+
+            if searched >= self.search_results_limit
+                || !file_name.starts_with(key.chars().nth(0).unwrap_or_default())
+            {
+                break;
+            }
+
+            if file_name.starts_with(key) {
+                self.search_results.push((file.clone(), key.to_string()));
+                searched += 1;
             }
         }
-        false
-    }
-
-    fn get_root_dir(&self) -> &PathBuf {
-        &self.root_dir
     }
 
     fn search_regex(&mut self, key: &str) {
@@ -183,95 +230,49 @@ impl SearchEngine for Search {
             let file_name = file.file_name().unwrap().to_str().unwrap();
             if regex.is_match(file_name) {
                 if let Some(re) = regex.find(file_name) {
-                    self.search_results.push((file.clone(), re.as_str().to_string()));
+                    self.search_results
+                        .push((file.clone(), re.as_str().to_string()));
                     searched += 1;
                 }
             }
         }
     }
 
-    fn get_results(&self) -> &Vec<(PathBuf, String)> {
-        &self.search_results
-    }
-
-    fn reset_search_results(&mut self) {
-        self.search_results.clear();
+    fn set_root_dir(&mut self, root_dir: PathBuf) {
+        self.root_dir = root_dir;
     }
 
     fn set_search_results_limit(&mut self, limit: usize) {
         self.search_results_limit = limit;
     }
+}
 
-    fn clear_index_files(&mut self) {
+impl Search {
+    fn clear_indexed_files(&mut self) {
         self.indexed_files.clear();
+        self.partition.clear();
     }
 
-    fn search(&mut self, key: &str) {
-        let mut searched = 0usize;
-        let start = self.partition.get(&key.chars().nth(0).unwrap_or_default()).cloned().unwrap_or(0);
-        let end = self.indexed_files.len();
-
-        for i in start..end {
-            let file = &self.indexed_files[i];
-            let file_name = file.file_name().unwrap().to_str().unwrap();
-
-            if searched >= self.search_results_limit || !file_name.starts_with(key.chars().nth(0).unwrap_or_default()) {
-                break;
-            }
-
-            if file_name.starts_with(key) {
-                self.search_results.push((file.clone(), key.to_string()));
-                searched += 1;
-            }
-        }
+    fn get_index_file_path(&self) -> String {
+        format!(
+            "index {}",
+            self.root_dir
+                .to_str()
+                .unwrap_or_default()
+                .replace("\\", "")
+                .replace(":", "")
+        )
     }
 
-    fn save_partition(&self) {
-        if self.partition.is_empty() {
-            return;
-        }
-
-        let file_path = format!(
+    fn get_partition_path(&self) -> String {
+        format!(
             "partition {}",
             self.root_dir
                 .to_str()
                 .unwrap_or_default()
                 .replace("\\", "")
                 .replace(":", "")
-        );
-
-        let file = File::create(file_path).expect("Fail to create file");
-        let writer = BufWriter::new(file);
-
-        if let Err(e) = bincode::serialize_into(writer, &self.partition) {
-            eprintln!("Failed to serialize partition: {}", e);
-        }
-    }
-
-    fn load_partition(&mut self) {
-        let file_path = format!(
-            "partition {}",
-            self.root_dir
-                .to_str()
-                .unwrap_or_default()
-                .replace("\\", "")
-                .replace(":", "")
-        );
-
-        let file = match File::open(file_path) {
-            Ok(file) => file,
-            Err(_) => {
-                self.partition = HashMap::new();
-                return;
-            }
-        };
-
-        let reader = BufReader::new(file);
-        self.partition = bincode::deserialize_from(reader).unwrap_or_default();
-    }
-
-    fn get_partition(&self) -> &HashMap<char, usize> {
-        &self.partition
+        )
     }
 }
 
