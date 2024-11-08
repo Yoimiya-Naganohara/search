@@ -34,44 +34,117 @@ fn initialize_search_engine(search_engine: &mut Search) {
     }
 }
 
+enum SortBy {
+    NONE,
+    SizeU,
+    SizeD,
+}
+
+fn sort_by(mut search_results: Vec<(PathBuf, String)>, sortby: SortBy) -> Vec<(PathBuf, String)> {
+    match sortby {
+        SortBy::SizeU => {
+            search_results.sort_by(|a, b| {
+                a.0.metadata()
+                    .unwrap()
+                    .len()
+                    .cmp(&b.0.metadata().unwrap().len())
+            });
+        }
+        SortBy::SizeD => {
+            search_results.sort_by(|b, a| {
+                a.0.metadata()
+                    .unwrap()
+                    .len()
+                    .cmp(&b.0.metadata().unwrap().len())
+            });
+        }
+        _ => {}
+    }
+    search_results
+}
+
 fn handle_message(
     msg: &str,
     search_engine: &mut Search,
     sender: &Arc<Mutex<Vec<(PathBuf, String)>>>,
 ) {
     match msg {
-        "UpdateIndex" => {
-            search_engine.clear_index_files();
-            let mut search_engine_clone = search_engine.clone();
-            thread::spawn(move || {
-                search_engine_clone.generate_index();
-                search_engine_clone.save_partition();
-                search_engine_clone.save_index();
-                search_engine_clone.clear_index_files();
-            });
-        }
-        msg if msg.starts_with("SearchRegex:") => {
-            let query = msg.trim_start_matches("SearchRegex:");
-            search_engine.search_regex(query);
-            update_sender_results(search_engine, sender);
-        }
-        msg if msg.starts_with("Search:") => {
-            let query = msg.trim_start_matches("Search:");
-            search_engine.search(query);
-            update_sender_results(search_engine, sender);
-        }
-        msg if msg.starts_with("SetRootDir:") => {
-            let dir = msg.trim_start_matches("SetRootDir:");
-            search_engine.set_root_dir(dir.into());
-        }
+        "UpdateIndex" => handle_update_index(search_engine),
+        msg if msg.starts_with("SearchRegex:") => handle_search_regex(msg, search_engine, sender),
+        msg if msg.starts_with("Search:") => handle_search(msg, search_engine, sender),
+        msg if msg.starts_with("SetRootDir:") => handle_set_root_dir(msg, search_engine),
         _ => {}
     }
 }
 
-fn update_sender_results(search_engine: &mut Search, sender: &Arc<Mutex<Vec<(PathBuf, String)>>>) {
+fn handle_update_index(search_engine: &mut Search) {
+    search_engine.clear_index_files();
+    let mut search_engine_clone = search_engine.clone();
+    thread::spawn(move || {
+        search_engine_clone.generate_index();
+        search_engine_clone.save_partition();
+        search_engine_clone.save_index();
+        search_engine_clone.clear_index_files();
+    });
+}
+
+fn handle_search_regex(
+    msg: &str,
+    search_engine: &mut Search,
+    sender: &Arc<Mutex<Vec<(PathBuf, String)>>>,
+) {
+    let mut query = msg.trim_start_matches("SearchRegex:");
+    let sortby = determine_sort_by(&mut query);
+    search_engine.search_regex(query);
+    let search_results = search_engine.get_results();
+    let search_results = sort_by(search_results.clone(), sortby);
+    update_sender_results(search_results, sender);
+    search_engine.reset_search_results();
+}
+
+fn handle_search(
+    msg: &str,
+    search_engine: &mut Search,
+    sender: &Arc<Mutex<Vec<(PathBuf, String)>>>,
+) {
+    let mut query = msg.trim_start_matches("Search:");
+    let sortby = determine_sort_by(&mut query);
+    search_engine.search(query);
+    let search_results = search_engine.get_results();
+    let search_results = sort_by(search_results.clone(), sortby);
+    update_sender_results(search_results, sender);
+    search_engine.reset_search_results();
+}
+
+fn handle_set_root_dir(msg: &str, search_engine: &mut Search) {
+    let dir = msg.trim_start_matches("SetRootDir:");
+    search_engine.set_root_dir(dir.into());
+}
+
+fn determine_sort_by(query: &mut &str) -> SortBy {
+    match *query {
+        q if q.ends_with(":size") => {
+            *query = q.trim_end_matches(":size");
+            SortBy::SizeU
+        }
+        q if q.ends_with(":size.u") => {
+            *query = q.trim_end_matches(":size.u");
+            SortBy::SizeU
+        }
+        q if q.ends_with(":size.d") => {
+            *query = q.trim_end_matches(":size.d");
+            SortBy::SizeD
+        }
+        _ => SortBy::NONE,
+    }
+}
+
+fn update_sender_results(
+    search_results: Vec<(PathBuf, String)>,
+    sender: &Arc<Mutex<Vec<(PathBuf, String)>>>,
+) {
     if let Ok(mut writer) = sender.lock() {
-        *writer = search_engine.get_results().clone();
-        search_engine.reset_search_results();
+        *writer = search_results;
     }
 }
 

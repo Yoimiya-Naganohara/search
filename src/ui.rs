@@ -192,7 +192,11 @@ impl SearchAppEngine for SearchApp {
                                         .clone()
                                         .on_hover_cursor(egui::CursorIcon::PointingHand);
                                     ui.add_space(-8.5);
-                                    label.on_hover_text(file_path);
+                                    label.on_hover_text(format!(
+                                        "{}\nfile size: {} B",
+                                        file_path,
+                                        path.metadata().unwrap().len()
+                                    ));
                                     if !part.ends_with(' ') {
                                         let matched_label = ui.strong(matched);
                                         if matched_label.clicked()
@@ -209,7 +213,11 @@ impl SearchAppEngine for SearchApp {
                                         matched_label
                                             .clone()
                                             .on_hover_cursor(egui::CursorIcon::PointingHand);
-                                        matched_label.on_hover_text(file_path);
+                                        matched_label.on_hover_text(format!(
+                                            "{}\nfile size: {} B",
+                                            file_path,
+                                            path.metadata().unwrap().len()
+                                        ));
                                         ui.add_space(-8.5);
                                     }
                                 }
