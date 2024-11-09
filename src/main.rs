@@ -3,8 +3,8 @@
 mod ui;
 
 use egui::{IconData, ViewportBuilder};
-use std::sync::mpsc::channel;
-use std::thread::{self};
+use std::sync::{mpsc::channel, Arc, Mutex};
+use std::thread;
 use ui::{SearchApp, SearchAppEngine};
 
 fn main() {
@@ -20,11 +20,12 @@ fn run_gui_mode() {
         ..Default::default()
     };
 
-    let shared_memory = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    let shared_memory_clone = std::sync::Arc::clone(&shared_memory);
+    let shared_memory = Arc::new(Mutex::new(Vec::new()));
+    let shared_memory_clone = Arc::clone(&shared_memory);
     thread::spawn(move || {
         search_engine::start_search_engine(recv, shared_memory_clone);
     });
+
     let _ = eframe::run_native(
         "Search",
         native_options,

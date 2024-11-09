@@ -8,6 +8,8 @@ use std::{
 
 use regex::Regex;
 
+use crate::SearchMode;
+
 #[derive(Clone)]
 pub(crate) struct Search {
     indexed_files: Vec<PathBuf>,
@@ -35,7 +37,7 @@ pub trait SearchEngine {
     fn save_partition(&self);
     fn load_partition(&mut self);
     fn search(&mut self, key: &str);
-    fn search_regex(&mut self, key: &str);
+    fn search_regex(&mut self, key: &str, mode: SearchMode);
     fn set_root_dir(&mut self, root_dir: PathBuf);
     fn set_search_results_limit(&mut self, limit: usize);
 }
@@ -47,39 +49,10 @@ impl SearchEngine for Search {
 
     fn generate_index(&mut self) {
         self.clear_indexed_files();
-        fn traverse_index(current_path: &PathBuf, indexed: &mut Vec<PathBuf>) {
-            if current_path.metadata().is_err() {
-                return;
-            }
-
-            if let Ok(entries) = read_dir(current_path) {
-                for entry in entries.flatten() {
-                    if entry.path().is_dir() {
-                        traverse_index(&entry.path(), indexed);
-                    } else if entry.path().is_file() {
-                        indexed.push(entry.path());
-                    }
-                }
-            }
-        }
-
-        traverse_index(&self.root_dir, &mut self.indexed_files);
+        self.traverse_index(&self.root_dir.clone());
         self.indexed_files
             .sort_by(|a, b| a.file_name().cmp(&b.file_name()));
-        for (i, path) in self.indexed_files.iter().enumerate() {
-            let k = path
-                .file_name()
-                .unwrap_or_default()
-                .to_str()
-                .unwrap_or_default()
-                .chars()
-                .nth(0)
-                .unwrap_or_default();
-            self.partition.entry(k).or_insert(i);
-        }
-
-        self.partition.shrink_to_fit();
-        self.indexed_files.shrink_to_fit();
+        self.create_partition();
     }
 
     fn get_index(&self) -> &Vec<PathBuf> {
@@ -218,7 +191,7 @@ impl SearchEngine for Search {
         }
     }
 
-    fn search_regex(&mut self, key: &str) {
+    fn search_regex(&mut self, key: &str, mode: SearchMode) {
         let regex = Regex::new(key).unwrap_or_else(|_| Regex::new("None").unwrap());
         let mut searched = 0usize;
 
@@ -227,7 +200,10 @@ impl SearchEngine for Search {
                 break;
             }
 
-            let file_name = file.file_name().unwrap().to_str().unwrap();
+            let file_name = match mode {
+                SearchMode::FILE => file.file_name().unwrap().to_str().unwrap(),
+                SearchMode::DIR => file.to_str().unwrap_or_default(),
+            };
             if regex.is_match(file_name) {
                 if let Some(re) = regex.find(file_name) {
                     self.search_results
@@ -251,6 +227,39 @@ impl Search {
     fn clear_indexed_files(&mut self) {
         self.indexed_files.clear();
         self.partition.clear();
+    }
+
+    fn traverse_index(&mut self, current_path: &PathBuf) {
+        if current_path.metadata().is_err() {
+            return;
+        }
+
+        if let Ok(entries) = read_dir(current_path) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    self.traverse_index(&entry.path());
+                } else if entry.path().is_file() {
+                    self.indexed_files.push(entry.path());
+                }
+            }
+        }
+    }
+
+    fn create_partition(&mut self) {
+        for (i, path) in self.indexed_files.iter().enumerate() {
+            let k = path
+                .file_name()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default()
+                .chars()
+                .nth(0)
+                .unwrap_or_default();
+            self.partition.entry(k).or_insert(i);
+        }
+
+        self.partition.shrink_to_fit();
+        self.indexed_files.shrink_to_fit();
     }
 
     fn get_index_file_path(&self) -> String {

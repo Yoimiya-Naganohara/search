@@ -10,6 +10,7 @@ use std::{
 
 use clipboard::ClipboardProvider;
 use egui::{FontDefinitions, FontFamily};
+use search_engine::{determine_search_mode, SearchMode};
 
 /// Represents the main application structure for the search functionality.
 pub struct SearchApp {
@@ -78,16 +79,13 @@ impl SearchAppEngine for SearchApp {
 
     fn execute_search(&mut self) {
         if let Some(msg_sender) = &self.message_sender {
-            if self.search_command.starts_with(':') {
-                let search_command = self.search_command.trim_start_matches(':');
-                msg_sender
-                    .send(format!("SearchRegex:{}", search_command))
-                    .unwrap();
+            let search_command = self.search_command.trim_start_matches(':');
+            let message = if self.search_command.starts_with(':') {
+                format!("SearchRegex:{}", search_command)
             } else {
-                msg_sender
-                    .send(format!("Search:{}", self.search_command))
-                    .unwrap();
-            }
+                format!("Search:{}", self.search_command)
+            };
+            msg_sender.send(message).unwrap();
         }
     }
 
@@ -129,8 +127,7 @@ impl SearchAppEngine for SearchApp {
         });
     }
 
-    fn render_settings_window(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-        let _ = ui;
+    fn render_settings_window(&mut self, ctx: &egui::Context, _ui: &mut egui::Ui) {
         egui::Window::new("Setting")
             .open(&mut self.display_dialog)
             .show(ctx, |ui| {
@@ -153,7 +150,7 @@ impl SearchAppEngine for SearchApp {
                 ui.heading("Update Index");
                 ui.label(format!(
                     "Automatic index update interval: {} seconds",
-                    self.avg_suspend_duration.as_secs().to_string()
+                    self.avg_suspend_duration.as_secs()
                 ));
                 if ui.button("Update Index Immediately").clicked() {
                     if let Some(sender) = &self.message_sender {
@@ -173,7 +170,14 @@ impl SearchAppEngine for SearchApp {
                             continue;
                         }
                         ui.horizontal(|ui| {
-                            let file_name = path.file_name().unwrap().to_str().unwrap();
+                            let binding = self.search_command.clone();
+                            let mut query = binding.as_str();
+                            let mode = determine_search_mode(&mut query);
+
+                            let file_name = match mode {
+                                SearchMode::FILE => path.file_name().unwrap().to_str().unwrap(),
+                                SearchMode::DIR => path.to_str().unwrap_or_default(),
+                            };
                             let file_name = format!("-{} ", file_name);
                             let default_visuals = ui.visuals().clone();
                             let file_name_parts: Vec<&str> = file_name.split(matched).collect();
@@ -195,7 +199,7 @@ impl SearchAppEngine for SearchApp {
                                     label.on_hover_text(format!(
                                         "{}\nfile size: {} B",
                                         file_path,
-                                        path.metadata().unwrap().len()
+                                        path.metadata().map_or(0, |info| info.len())
                                     ));
                                     if !part.ends_with(' ') {
                                         let matched_label = ui.strong(matched);
@@ -216,7 +220,13 @@ impl SearchAppEngine for SearchApp {
                                         matched_label.on_hover_text(format!(
                                             "{}\nfile size: {} B",
                                             file_path,
-                                            path.metadata().unwrap().len()
+                                            {
+                                                if let Ok(info) = path.metadata() {
+                                                    info.len()
+                                                } else {
+                                                    0
+                                                }
+                                            }
                                         ));
                                         ui.add_space(-8.5);
                                     }
@@ -273,7 +283,7 @@ impl SearchAppEngine for SearchApp {
                 if let Some(sender) = &self.message_sender {
                     let _ = sender.send(format!(
                         ":{}",
-                        self.avg_suspend_duration.as_secs().to_string()
+                        self.avg_suspend_duration.as_secs()
                     ));
                 }
             }

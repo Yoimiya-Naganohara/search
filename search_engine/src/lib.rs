@@ -47,7 +47,7 @@ fn sort_by(mut search_results: Vec<(PathBuf, String)>, sortby: SortBy) -> Vec<(P
                 a.0.metadata()
                     .unwrap()
                     .len()
-                    .cmp(&b.0.metadata().unwrap().len())
+                    .cmp(&b.0.metadata().map_or(0, |x| x.len()))
             });
         }
         SortBy::SizeD => {
@@ -55,7 +55,7 @@ fn sort_by(mut search_results: Vec<(PathBuf, String)>, sortby: SortBy) -> Vec<(P
                 a.0.metadata()
                     .unwrap()
                     .len()
-                    .cmp(&b.0.metadata().unwrap().len())
+                    .cmp(&b.0.metadata().map_or(0, |x| x.len()))
             });
         }
         _ => {}
@@ -94,8 +94,9 @@ fn handle_search_regex(
     sender: &Arc<Mutex<Vec<(PathBuf, String)>>>,
 ) {
     let mut query = msg.trim_start_matches("SearchRegex:");
+    let search_mode = determine_search_mode(&mut query);
     let sortby = determine_sort_by(&mut query);
-    search_engine.search_regex(query);
+    search_engine.search_regex(query, search_mode);
     let search_results = search_engine.get_results();
     let search_results = sort_by(search_results.clone(), sortby);
     update_sender_results(search_results, sender);
@@ -114,6 +115,25 @@ fn handle_search(
     let search_results = sort_by(search_results.clone(), sortby);
     update_sender_results(search_results, sender);
     search_engine.reset_search_results();
+}
+
+#[derive(PartialEq)] pub enum SearchMode {
+    DIR,
+    FILE,
+}
+
+pub fn determine_search_mode(query: &mut &str) -> SearchMode {
+    match *query {
+        q if q.contains("file:") => {
+            *query = q.trim_start_matches("file:");
+            SearchMode::FILE
+        }
+        q if q.contains("dir:") => {
+            *query = q.trim_start_matches("dir:");
+            SearchMode::DIR
+        }
+        _ => SearchMode::FILE,
+    }
 }
 
 fn handle_set_root_dir(msg: &str, search_engine: &mut Search) {
