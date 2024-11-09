@@ -117,7 +117,8 @@ fn handle_search(
     search_engine.reset_search_results();
 }
 
-#[derive(PartialEq)] pub enum SearchMode {
+#[derive(PartialEq)]
+pub enum SearchMode {
     DIR,
     FILE,
 }
@@ -139,6 +140,8 @@ pub fn determine_search_mode(query: &mut &str) -> SearchMode {
 fn handle_set_root_dir(msg: &str, search_engine: &mut Search) {
     let dir = msg.trim_start_matches("SetRootDir:");
     search_engine.set_root_dir(dir.into());
+    search_engine.load_index();
+    search_engine.load_partition();
 }
 
 fn determine_sort_by(query: &mut &str) -> SortBy {
