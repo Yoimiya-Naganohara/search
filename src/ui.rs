@@ -161,7 +161,7 @@ impl SearchAppEngine for SearchApp {
     }
 
     fn render_results_list(&mut self, ui: &mut egui::Ui) {
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        egui::ScrollArea::both().show(ui, |ui| {
             ui.set_width(ui.available_width());
             if let Some(receiver) = &self.message_receiver {
                 if let Ok(msg) = receiver.lock() {

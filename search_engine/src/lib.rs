@@ -45,16 +45,14 @@ fn sort_by(mut search_results: Vec<(PathBuf, String)>, sortby: SortBy) -> Vec<(P
         SortBy::SizeU => {
             search_results.sort_by(|a, b| {
                 a.0.metadata()
-                    .unwrap()
-                    .len()
+                    .map_or(0, |metadata| metadata.len())
                     .cmp(&b.0.metadata().map_or(0, |x| x.len()))
             });
         }
         SortBy::SizeD => {
             search_results.sort_by(|b, a| {
                 a.0.metadata()
-                    .unwrap()
-                    .len()
+                    .map_or(0, |metadata| metadata.len())
                     .cmp(&b.0.metadata().map_or(0, |x| x.len()))
             });
         }
